@@ -1,0 +1,612 @@
+{
+  "name": "Flujo 2 - CRUD de Productos (Catálogo)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "node-f2-exec-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1000,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "node-f2-manual-trigger",
+      "name": "Manual Trigger - CRUD",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1000,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item.json;\nconst tenant = item.tenant || {};\nconst sender = item.sender || {};\nconst msg = item.message || {};\n\nconst text = msg.text || item.original_message || item.message || item.text || '';\nconst number = sender.number || tenant.number || item.number || '521234567890';\nconst tenantId = tenant.id || item.tenant_id || '';\nconst tenantName = tenant.name || item.tenant_name || 'Negocio';\nconst phoneId = tenant.whatsapp_phone_number_id || item.whatsapp_phone_number_id || '10023456789';\nconst token = tenant.whatsapp_access_token || item.whatsapp_access_token || 'EAAG_DEMO_TOKEN';\n\nreturn {\n  original_message: text,\n  wa_number: number,\n  tenant_id: tenantId,\n  tenant_name: tenantName,\n  whatsapp_phone_number_id: phoneId,\n  whatsapp_access_token: token,\n  tenant: tenant,\n  sender: sender\n};"
+      },
+      "id": "node-f2-normalizer",
+      "name": "Code - Normalizar Entrada Orquestador CRUD",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -780,
+        390
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "openai/gpt-4o-mini",
+          "mode": "id"
+        },
+        "options": {
+          "temperature": 0.1,
+          "maxTokens": 500
+        }
+      },
+      "id": "node-f2-lm-openrouter",
+      "name": "LM - OpenRouter (CRUD)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        560
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "OPENROUTER_CREDENTIAL_ID",
+          "name": "OpenRouter via OpenAI compat"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "agent": "conversationalAgent",
+        "promptType": "define",
+        "text": "=Analiza la intención de gestión de catálogo de productos del negocio a partir del mensaje:\n\nMensaje: \"{{ $json.original_message }}\"\n\nDetermina la acción:\n- LIST: ver inventario, ver productos, catálogo, listar\n- CREATE: crear producto, agregar producto nuevo\n- UPDATE_PRICE: cambiar precio, actualizar precio\n- DELETE: eliminar producto, desactivar producto, borrar\n- ADJUST_STOCK: agregar stock, restar stock, sumar stock, reducir stock, modificar stock\n\nResponde ÚNICAMENTE en JSON plano:\n{\n  \"action\": \"LIST\" | \"CREATE\" | \"UPDATE_PRICE\" | \"DELETE\" | \"ADJUST_STOCK\",\n  \"product_name\": \"nombre del producto o término\",\n  \"price\": 100,\n  \"stock\": 10,\n  \"quantity_change\": 5\n}",
+        "options": {
+          "systemMessage": "Eres un asistente de catálogo para WhatsApp. Extraes acciones e intenciones del negocio en JSON estricto."
+        }
+      },
+      "id": "node-f2-ai-agent",
+      "name": "AI Agent - Catálogo CRUD",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -560,
+        390
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawOutput = $input.item.json.output || $input.item.json.text || '{}';\nconst norm = $('Code - Normalizar Entrada Orquestador CRUD').item.json;\nlet parsed = { action: 'LIST', product_name: '', price: null, stock: null, quantity_change: 0 };\n\ntry {\n  const jsonMatch = rawOutput.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);\n} catch(e) {}\n\nconst action = parsed.action || 'LIST';\nconst txtLower = (norm.original_message || '').toLowerCase();\n\nlet delta = parsed.quantity_change || 0;\nif (txtLower.includes('restar') || txtLower.includes('quitar') || txtLower.includes('reducir')) {\n  if (delta > 0) delta = -delta;\n}\n\nreturn {\n  ...norm,\n  action: action,\n  product_name: parsed.product_name || '',\n  price: parsed.price || null,\n  stock: parsed.stock || null,\n  quantity_change: delta\n};"
+      },
+      "id": "node-f2-parse-crud",
+      "name": "Code - Parsear Respuesta CRUD",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -340,
+        390
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "LIST",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "list"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "CREATE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "create"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "UPDATE_PRICE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "update_price"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "DELETE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "delete"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "ADJUST_STOCK",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "adjust_stock"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-f2-switch-action",
+      "name": "Switch - Acción CRUD",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        -120,
+        390
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "products",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "tenant_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.tenant_id }}"
+            },
+            {
+              "keyName": "is_active",
+              "condition": "eq",
+              "keyValue": "true"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "id": "node-f2-supabase-list",
+      "name": "Supabase - Listar Productos",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        140,
+        100
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "w3SOCCrBlarr2lvz",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "products",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "tenant_id",
+              "fieldValue": "={{ $json.tenant_id }}"
+            },
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $json.product_name }}"
+            },
+            {
+              "fieldId": "price",
+              "fieldValue": "={{ $json.price || 0 }}"
+            },
+            {
+              "fieldId": "stock",
+              "fieldValue": "={{ $json.stock || 0 }}"
+            },
+            {
+              "fieldId": "is_active",
+              "fieldValue": "true"
+            }
+          ]
+        }
+      },
+      "id": "node-f2-supabase-create",
+      "name": "Supabase - Crear Producto",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        140,
+        240
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "w3SOCCrBlarr2lvz",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "products",
+        "matchingColumns": [
+          "tenant_id",
+          "name"
+        ],
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "price",
+              "fieldValue": "={{ $json.price }}"
+            }
+          ]
+        }
+      },
+      "id": "node-f2-supabase-update-price",
+      "name": "Supabase - Actualizar Precio",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        140,
+        380
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "w3SOCCrBlarr2lvz",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "products",
+        "matchingColumns": [
+          "tenant_id",
+          "name"
+        ],
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "is_active",
+              "fieldValue": "false"
+            }
+          ]
+        }
+      },
+      "id": "node-f2-supabase-delete",
+      "name": "Supabase - Desactivar Producto",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        140,
+        520
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "w3SOCCrBlarr2lvz",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "rpc",
+        "functionName": "adjust_product_stock",
+        "parametersUi": {
+          "parameterValues": [
+            {
+              "name": "p_tenant_id",
+              "value": "={{ $json.tenant_id }}"
+            },
+            {
+              "name": "p_product_name",
+              "value": "={{ $json.product_name }}"
+            },
+            {
+              "name": "p_quantity_change",
+              "value": "={{ $json.quantity_change }}"
+            }
+          ]
+        }
+      },
+      "id": "node-f2-supabase-adjust-stock",
+      "name": "Supabase - Ajustar Stock Relativo RPC",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        140,
+        660
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "w3SOCCrBlarr2lvz",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst norm = $('Code - Normalizar Entrada Orquestador CRUD').item.json;\nconst parseData = $('Code - Parsear Respuesta CRUD').item.json;\nconst action = parseData.action;\n\nlet msg = '';\nlet buttons = [];\nconst sep = '━'.repeat(28);\n\nif (action === 'LIST') {\n  const validProducts = items.map(i => i.json).filter(p => p && p.id && p.name && p.is_active !== false);\n\n  if (validProducts.length === 0) {\n    msg = `📦 *INVENTARIO DE PRODUCTOS*\\n${sep}\\nActualmente no tienes productos registrados o activos en tu catálogo.\\n\\n💡 *Para agregar uno escribe:* \"crear producto Camisa Azul precio 350 stock 20\"`;\n    buttons = [\n      { id: \"tareas\", title: \"📋 Ver Tareas\" },\n      { id: \"menu\", title: \"🏠 Menú Principal\" }\n    ];\n  } else {\n    let listTxt = validProducts.map((p, idx) => `${idx + 1}️⃣ *${p.name}*: $${parseFloat(p.price || 0).toFixed(2)} | Stock: ${p.stock || 0} u.`).join('\\n');\n    msg = `📦 *INVENTARIO DE PRODUCTOS*\\n${sep}\\n${listTxt}\\n${sep}\\nTotal: ${validProducts.length} productos activos.`;\n    buttons = [\n      { id: \"tareas\", title: \"📋 Ver Tareas\" },\n      { id: \"generar reporte\", title: \"📊 Reporte Hoy\" },\n      { id: \"menu\", title: \"🏠 Menú Principal\" }\n    ];\n  }\n} else if (action === 'CREATE') {\n  const p = (items[0] && items[0].json && items[0].json.name) ? items[0].json : parseData;\n  const priceVal = parseFloat(p.price || parseData.price || 0).toFixed(2);\n  const stockVal = p.stock ?? parseData.stock ?? 0;\n  msg = `✅ *PRODUCTO CREADO*\\n${sep}\\n📌 *${p.name || parseData.product_name}*\\n💰 Precio: $${priceVal}\\n📦 Stock inicial: ${stockVal} unidades`;\n  buttons = [\n    { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n    { id: \"tareas\", title: \"📋 Ver Tareas\" }\n  ];\n} else if (action === 'UPDATE_PRICE') {\n  const priceVal = parseFloat(parseData.price || 0).toFixed(2);\n  msg = `✅ *PRECIO ACTUALIZADO*\\n${sep}\\n📌 *${parseData.product_name}*\\n💰 Nuevo precio: $${priceVal}`;\n  buttons = [\n    { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n    { id: \"tareas\", title: \"📋 Ver Tareas\" }\n  ];\n} else if (action === 'DELETE') {\n  msg = `🗑️ *PRODUCTO DESACTIVADO*\\n${sep}\\n📌 *${parseData.product_name}* ha sido desactivado del catálogo.`;\n  buttons = [\n    { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n    { id: \"menu\", title: \"🏠 Menú Principal\" }\n  ];\n} else if (action === 'ADJUST_STOCK') {\n  const delta = parseData.quantity_change;\n  const sign = delta > 0 ? `+${delta}` : `${delta}`;\n  msg = `📦 *STOCK ACTUALIZADO*\\n${sep}\\n📌 *${parseData.product_name}*\\n🔄 Ajuste: ${sign} unidades.`;\n  buttons = [\n    { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n    { id: \"generar reporte\", title: \"📊 Reporte Hoy\" }\n  ];\n}\n\nreturn {\n  wa_number: norm.wa_number,\n  wa_message: msg,\n  buttons: buttons,\n  phone_number_id: norm.whatsapp_phone_number_id,\n  access_token: norm.whatsapp_access_token\n};"
+      },
+      "id": "node-f2-format-response",
+      "name": "Code - Formatear Respuesta CRUD",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        390
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/{{ $json.phone_number_id }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.buttons && $json.buttons.length > 0 ? JSON.stringify({ \"messaging_product\": \"whatsapp\", \"recipient_type\": \"individual\", \"to\": $json.wa_number, \"type\": \"interactive\", \"interactive\": { \"type\": \"button\", \"body\": { \"text\": $json.wa_message }, \"action\": { \"buttons\": $json.buttons.slice(0, 3).map(b => ({ \"type\": \"reply\", \"reply\": { \"id\": b.id, \"title\": b.title.slice(0, 20) } })) } } }) : JSON.stringify({ \"messaging_product\": \"whatsapp\", \"to\": $json.wa_number, \"type\": \"text\", \"text\": { \"body\": $json.wa_message } }) }}",
+        "options": {}
+      },
+      "id": "node-f2-http-send",
+      "name": "HTTP - Enviar Respuesta WhatsApp Admin",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        390
+      ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code - Normalizar Entrada Orquestador CRUD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger - CRUD": {
+      "main": [
+        [
+          {
+            "node": "Code - Normalizar Entrada Orquestador CRUD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Normalizar Entrada Orquestador CRUD": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Catálogo CRUD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LM - OpenRouter (CRUD)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Catálogo CRUD",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Catálogo CRUD": {
+      "main": [
+        [
+          {
+            "node": "Code - Parsear Respuesta CRUD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Parsear Respuesta CRUD": {
+      "main": [
+        [
+          {
+            "node": "Switch - Acción CRUD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Acción CRUD": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Listar Productos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase - Crear Producto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase - Actualizar Precio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase - Desactivar Producto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase - Ajustar Stock Relativo RPC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Listar Productos": {
+      "main": [
+        [
+          {
+            "node": "Code - Formatear Respuesta CRUD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Crear Producto": {
+      "main": [
+        [
+          {
+            "node": "Code - Formatear Respuesta CRUD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Actualizar Precio": {
+      "main": [
+        [
+          {
+            "node": "Code - Formatear Respuesta CRUD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Desactivar Producto": {
+      "main": [
+        [
+          {
+            "node": "Code - Formatear Respuesta CRUD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Ajustar Stock Relativo RPC": {
+      "main": [
+        [
+          {
+            "node": "Code - Formatear Respuesta CRUD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Formatear Respuesta CRUD": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Enviar Respuesta WhatsApp Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

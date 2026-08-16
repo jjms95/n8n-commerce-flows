@@ -1,0 +1,663 @@
+{
+  "name": "Flujo 0 - Orquestador WhatsApp (Multi-Tenant)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": [
+          "GET",
+          "POST"
+        ],
+        "path": "whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook-inbound",
+      "name": "Webhook - Meta WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] || 'OK' }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-respond-meta-verify",
+      "name": "Respond to Webhook - Meta GET Challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -900,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.item.json.body || $input.item.json || {};\nlet entry = (body.entry && body.entry[0]) ? body.entry[0] : {};\nlet changes = (entry.changes && entry.changes[0]) ? entry.changes[0] : {};\nlet value = changes.value || body.value || {};\nlet metadata = value.metadata || body.metadata || {};\nlet messages = (value.messages && value.messages[0]) ? value.messages[0] : (body.messages && body.messages[0] ? body.messages[0] : {});\nlet contacts = (value.contacts && value.contacts[0]) ? value.contacts[0] : (body.contacts && body.contacts[0] ? body.contacts[0] : {});\n\nconst phone_number_id = metadata.phone_number_id || body.phone_number_id || '10023456789';\nlet sender_number   = messages.from || body.number || body.from || '';\nlet message_text    = '';\nlet button_id       = '';\n\nif (messages.interactive && messages.interactive.button_reply) {\n  button_id = messages.interactive.button_reply.id || '';\n  message_text = button_id || messages.interactive.button_reply.title || '';\n} else if (messages.interactive && messages.interactive.list_reply) {\n  button_id = messages.interactive.list_reply.id || '';\n  message_text = button_id || messages.interactive.list_reply.title || '';\n} else if (messages.type === 'button' && messages.button) {\n  button_id = messages.button.payload || messages.button.text || '';\n  message_text = button_id || messages.button.text || '';\n} else if (messages.type === 'location' && messages.location) {\n  const loc = messages.location;\n  message_text = `UBICACION: ${loc.latitude},${loc.longitude} (${loc.name || loc.address || ''})`.trim();\n} else if (messages.text && messages.text.body) {\n  message_text = messages.text.body;\n} else {\n  message_text = body.message || body.text || '';\n}\n\nconst contact_name = (contacts.profile && contacts.profile.name) ? contacts.profile.name : (body.name || 'Cliente');\nlet media_url = '';\nif (messages.type === 'image' && messages.image) {\n  media_url = messages.image.id || messages.image.link || 'https://example.com/comprobante.jpg';\n} else {\n  media_url = body.media_url || '';\n}\n\nreturn {\n  phone_number_id,\n  sender_number: (sender_number || '').trim(),\n  message_text: (message_text || '').trim(),\n  button_id: button_id || '',\n  contact_name,\n  media_url,\n  timestamp: messages.timestamp || Math.floor(Date.now() / 1000)\n};"
+      },
+      "id": "node-parse-meta-payload",
+      "name": "Code - Extraer Datos Meta Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -900,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-respond-meta-post",
+      "name": "Respond to Webhook - Meta POST OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "tenants",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "whatsapp_phone_number_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.phone_number_id }}"
+            }
+          ]
+        }
+      },
+      "id": "node-supabase-lookup-tenant",
+      "name": "Supabase - Buscar Tenant por Phone ID",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -680,
+        480
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "w3SOCCrBlarr2lvz",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const tenant = $input.first() ? $input.first().json : null;\nconst meta = $('Code - Extraer Datos Meta Payload').item.json;\n\nif (!tenant || !tenant.id) {\n  return {\n    found: false,\n    message: '\u26d4 Este n\u00famero de WhatsApp Business no est\u00e1 registrado en el sistema.',\n    sender_number: meta.sender_number\n  };\n}\n\nconst isBusiness = (meta.sender_number === tenant.number);\nreturn {\n  found: true,\n  tenant: {\n    id: tenant.id,\n    name: tenant.name,\n    number: tenant.number,\n    whatsapp_phone_number_id: tenant.whatsapp_phone_number_id,\n    whatsapp_access_token: tenant.whatsapp_access_token,\n    require_delivery_address: tenant.require_delivery_address !== false,\n    enable_sales: tenant.enable_sales !== false,\n    enable_crud: tenant.enable_crud !== false,\n    enable_reports: tenant.enable_reports !== false,\n    enable_appointments: tenant.enable_appointments !== false\n  },\n  sender: {\n    type: isBusiness ? 'business' : 'client',\n    number: meta.sender_number,\n    name: isBusiness ? tenant.name : meta.contact_name\n  },\n  message: {\n    text: meta.message_text,\n    button_id: meta.button_id || '',\n    media_url: meta.media_url,\n    timestamp: meta.timestamp\n  }\n};"
+      },
+      "id": "node-code-eval-role",
+      "name": "Code - Evaluar Rol Negocio o Cliente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -450,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true
+          },
+          "conditions": [
+            {
+              "id": "is-business",
+              "leftValue": "={{ $json.sender.type }}",
+              "rightValue": "business",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-if-business-client",
+      "name": "IF - \u00bfEs Business o Client?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "clients",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "tenant_id",
+              "fieldValue": "={{ $json.tenant.id }}"
+            },
+            {
+              "fieldId": "number",
+              "fieldValue": "={{ $json.sender.number }}"
+            },
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $json.sender.name }}"
+            }
+          ]
+        }
+      },
+      "id": "node-supabase-upsert-client",
+      "name": "Supabase - Upsert Cliente",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        0,
+        600
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "w3SOCCrBlarr2lvz",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const upsertRes = $input.first() ? $input.first().json : {};\nconst ctx = $('Code - Evaluar Rol Negocio o Cliente').item.json;\n\nreturn {\n  tenant: ctx.tenant,\n  sender: {\n    ...ctx.sender,\n    client_id: upsertRes.id || ctx.sender.client_id\n  },\n  message: ctx.message\n};"
+      },
+      "id": "node-code-attach-client-id",
+      "name": "Code - Adjuntar Client ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "openai/gpt-4o-mini",
+          "mode": "id"
+        },
+        "options": {
+          "temperature": 0.1,
+          "maxTokens": 400
+        }
+      },
+      "id": "lm-openrouter-orchestrator",
+      "name": "LM - OpenRouter (Orquestador)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        0,
+        500
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "OPENROUTER_CREDENTIAL_ID",
+          "name": "OpenRouter via OpenAI compat"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "agent": "conversationalAgent",
+        "promptType": "define",
+        "text": "=Clasifica la intención del siguiente mensaje recibido en el WhatsApp del negocio.\n\nRol del emisor: {{ $json.sender.type }}\nMensaje del usuario: \"{{ $json.message.text }}\"\nHerramientas activas del negocio:\n- Ventas: {{ $json.tenant.enable_sales }}\n- CRUD Catálogo: {{ $json.tenant.enable_crud }}\n- Reportes: {{ $json.tenant.enable_reports }}\n- Citas: {{ $json.tenant.enable_appointments }}\n\nINSTRUCCIONES DE CLASIFICACIÓN:\n1. Si el emisor es 'business' (dueño del negocio):\n   - 'help_menu': Saludos ('hola', 'buenas', 'hey'), pedir menú, ayuda o textos generales.\n   - 'tasks_dashboard': Pedir resumen de tareas o pendientes ('tareas', 'pendientes', 'qué hay por hacer').\n   - 'sales': Aprobar o rechazar pagos, consultar despachos/entregas, pausar o activar bot, modificar pedidos ('aprobar 573...', 'rechazar...', 'despachos', 'entregas', 'pausar bot', 'activar bot', 'despachar').\n   - 'crud': Consultar o modificar inventario/precios ('ver inventario', 'agregar stock 10 a camisa', 'cambiar precio a 500', 'crear producto').\n   - 'reports': Solicitar reportes de ventas o resumen diario ('generar reporte', 'cuánto se vendió hoy').\n   - 'appointments': Ver agenda de citas o cancelar citas del negocio ('ver citas', 'agenda hoy').\n2. Si el emisor es 'client' (cliente que compra):\n   - 'appointments': Querer agendar, reservar o consultar citas ('quiero agendar cita', 'reserva').\n   - 'sales': Búsqueda de productos, selección de cantidades, carrito de compras, preguntas sobre compras, saludos de cliente o proceso de pago ('hola', 'busco camisa', 'precio', '1', '2', 'si', 'checkout').\n\nResponde ÚNICAMENTE en formato JSON plano:\n{\"subflow\": \"help_menu\" | \"tasks_dashboard\" | \"sales\" | \"crud\" | \"reports\" | \"appointments\"}",
+        "options": {
+          "systemMessage": "Eres un clasificador inteligente de intención para un sistema conversacional de WhatsApp multi-tenant. Responde estrictamente con el JSON solicitado."
+        }
+      },
+      "id": "ai-agent-orchestrator-intent",
+      "name": "AI Agent - Clasificador de Intenci\u00f3n",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        0,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawOutput = $input.item.json.output || $input.item.json.text || '{}';\nconst ctx = $('Code - Evaluar Rol Negocio o Cliente').item.json;\nlet subflow = ctx.sender.type === 'business' ? 'help_menu' : 'sales';\n\ntry {\n  const jsonMatch = rawOutput.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    const parsed = JSON.parse(jsonMatch[0]);\n    if (parsed.subflow) subflow = parsed.subflow;\n  }\n} catch(e) {\n  // fallback\n}\n\n// Verificar permisos del negocio para la herramienta seleccionada\nconst t = ctx.tenant;\nif (subflow === 'sales' && !t.enable_sales) subflow = 'disabled';\nif (subflow === 'crud' && !t.enable_crud) subflow = 'disabled';\nif (subflow === 'reports' && !t.enable_reports) subflow = 'disabled';\nif (subflow === 'appointments' && !t.enable_appointments) subflow = 'disabled';\n\nreturn {\n  ...ctx,\n  subflow\n};"
+      },
+      "id": "node-code-parse-ai-intent",
+      "name": "Code - Parsear Intenci\u00f3n IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.subflow }}",
+                    "rightValue": "help_menu",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "help_menu"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.subflow }}",
+                    "rightValue": "crud",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "crud"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.subflow }}",
+                    "rightValue": "sales",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "sales"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.subflow }}",
+                    "rightValue": "reports",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reports"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.subflow }}",
+                    "rightValue": "appointments",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "appointments"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-switch-subflows",
+      "name": "Switch - Delegar a Sub-flujos",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        440,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "flujo1_ventas_estados",
+        "options": {}
+      },
+      "id": "node-execute-subflow-sales",
+      "name": "Execute Sub-flujo Ventas",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        680,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "flujo2_crud_productos",
+        "options": {}
+      },
+      "id": "node-execute-subflow-crud",
+      "name": "Execute Sub-flujo CRUD Productos",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        680,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "flujo3_reportes_automatizados",
+        "options": {}
+      },
+      "id": "node-execute-subflow-reports",
+      "name": "Execute Sub-flujo Reportes",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        680,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "flujo4_agendamiento_citas",
+        "options": {}
+      },
+      "id": "node-execute-subflow-appointments",
+      "name": "Execute Sub-flujo Citas",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        680,
+        680
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $input.item.json;\nconst t = ctx.tenant;\nconst menu = `🛠️ *MENÚ DE HERRAMIENTAS DEL NEGOCIO*\\n🏢 *${t.name}*\\n\\n` +\n`Tus herramientas activas:\\n` +\n(t.enable_sales ? `✅ *Ventas y Despachos*: Pagos 1-clic, pedidos y envíos\\n` : '') +\n(t.enable_crud ? `✅ *Catálogo*: Inventario, precios y stock\\n` : '') +\n(t.enable_appointments ? `✅ *Citas*: Agenda comercial\\n` : '') +\n(t.enable_reports ? `✅ *Reportes*: Balance de ventas\\n` : '') +\n`\\n👇 _Selecciona una acción rápida o escribe tu consulta:_`;\n\nconst buttons = [\n  { id: \"tareas\", title: \"📋 Ver Tareas\" },\n  { id: \"despachos\", title: \"🚚 Ver Despachos\" },\n  { id: \"ver inventario\", title: \"📦 Ver Inventario\" }\n];\n\nreturn {\n  wa_number: t.number,\n  wa_message: menu,\n  buttons: buttons,\n  phone_number_id: t.whatsapp_phone_number_id,\n  access_token: t.whatsapp_access_token\n};"
+      },
+      "id": "node-code-build-help-menu",
+      "name": "Code - Construir Menú Ayuda",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/{{ $json.phone_number_id }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.buttons && $json.buttons.length > 0 ? JSON.stringify({ \"messaging_product\": \"whatsapp\", \"recipient_type\": \"individual\", \"to\": $json.wa_number, \"type\": \"interactive\", \"interactive\": { \"type\": \"button\", \"body\": { \"text\": $json.wa_message }, \"action\": { \"buttons\": $json.buttons.slice(0, 3).map(b => ({ \"type\": \"reply\", \"reply\": { \"id\": b.id, \"title\": b.title.slice(0, 20) } })) } } }) : JSON.stringify({ \"messaging_product\": \"whatsapp\", \"to\": $json.wa_number, \"type\": \"text\", \"text\": { \"body\": $json.wa_message } }) }}",
+        "options": {}
+      },
+      "id": "node-http-send-help-menu",
+      "name": "HTTP - Enviar Menú WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook - Meta WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook - Meta GET Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code - Extraer Datos Meta Payload",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond to Webhook - Meta POST OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Extraer Datos Meta Payload": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Buscar Tenant por Phone ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Buscar Tenant por Phone ID": {
+      "main": [
+        [
+          {
+            "node": "Code - Evaluar Rol Negocio o Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Evaluar Rol Negocio o Cliente": {
+      "main": [
+        [
+          {
+            "node": "IF - \u00bfEs Business o Client?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - \u00bfEs Business o Client?": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Clasificador de Intenci\u00f3n",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase - Upsert Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LM - OpenRouter (Orquestador)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Clasificador de Intenci\u00f3n",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Clasificador de Intenci\u00f3n": {
+      "main": [
+        [
+          {
+            "node": "Code - Parsear Intenci\u00f3n IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Parsear Intenci\u00f3n IA": {
+      "main": [
+        [
+          {
+            "node": "Switch - Delegar a Sub-flujos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Upsert Cliente": {
+      "main": [
+        [
+          {
+            "node": "Code - Adjuntar Client ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Adjuntar Client ID": {
+      "main": [
+        [
+          {
+            "node": "Execute Sub-flujo Ventas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Delegar a Sub-flujos": {
+      "main": [
+        [
+          {
+            "node": "Code - Construir Men\u00fa Ayuda",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute Sub-flujo CRUD Productos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute Sub-flujo Ventas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute Sub-flujo Reportes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute Sub-flujo Citas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Construir Men\u00fa Ayuda": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Enviar Men\u00fa WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
