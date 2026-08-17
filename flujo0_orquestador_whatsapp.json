@@ -21,7 +21,7 @@
     {
       "parameters": {
         "respondWith": "text",
-        "responseBody": "={{ $json.query['hub.challenge'] || 'OK' }}",
+        "responseBody": "={{ $json.query['hub.challenge'] || $json.query.hub_challenge || $json.query['hub_challenge'] || $json['hub.challenge'] || $json.hub_challenge || 'OK' }}",
         "options": {
           "responseCode": 200
         }
