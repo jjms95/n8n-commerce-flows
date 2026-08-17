@@ -13,6 +13,7 @@ A complete, production-ready, multi-tenant conversational automation ecosystem f
 | 💬 [**Usage Examples & Test Payloads**](docs/usage_examples.md) | Full table of commands for business owners (`ROLE: BUSINESS`), customer dialogues (`ROLE: CLIENT`), and cURL payloads. |
 | 🗄️ [**SQL Test Queries & Seed Data**](docs/test_queries.md) | Ready-to-run Supabase scripts: tenant seeding, product catalog, customer records, state machine simulations, and RPC tests. |
 | 🏗️ [**Technical Architecture & State Machine**](docs/flow_architecture.md) | System diagrams, 7-state sales machine, LangChain AI classifier logic, multi-tenant data model, and RLS policies. |
+| 🔄 [**Git Workflow Sync Manager (CI/CD)**](docs/git_sync_guide.md) | Automated GitHub Push Webhook sync to create and update N8N workflows dynamically. |
 
 ---
 
@@ -22,6 +23,7 @@ A complete, production-ready, multi-tenant conversational automation ecosystem f
 .
 ├── README.md                           # 📖 Main Project Documentation
 ├── supabase_setup.sql                  # 🗄️ Database DDL, RLS Policies, Indexes & RPC Functions
+├── n8n_git_sync_manager.json           # 🔄 Git Workflow Sync Manager (CI/CD for N8N)
 ├── flow0_whatsapp_orchestrator.json    # 🔀 Master Orchestrator (Meta Webhook GET/POST + AI Classifier)
 ├── flow1_sales_state_machine.json      # 🛒 7-State Conversational Sales Machine & Atomic Checkout
 ├── flow2_product_catalog_crud.json     # 📦 Catalog Management & Relative Stock (+/-)
@@ -31,7 +33,8 @@ A complete, production-ready, multi-tenant conversational automation ecosystem f
     ├── production_deployment.md        # 🌐 Server Deployment, SSL & Meta Webhook Verification
     ├── flow_architecture.md            # 🏗️ Architecture, State Machine & Multi-Tenant Model
     ├── usage_examples.md               # 💬 Interactive Chat Examples & cURL Simulation Payloads
-    └── test_queries.md                 # 🧪 SQL Queries, Seed Scripts & RPC Validation Tests
+    ├── test_queries.md                 # 🧪 SQL Queries, Seed Scripts & RPC Validation Tests
+    └── git_sync_guide.md               # 🔄 GitHub Push Webhook CI/CD Sync Guide
 ```
 
 ---

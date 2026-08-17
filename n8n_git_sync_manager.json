@@ -1,0 +1,453 @@
+{
+  "name": "N8N Git Workflow Sync Manager (Multi-Repo CI/CD)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "github-push-sync",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-sync-webhook-trigger",
+      "name": "Webhook - GitHub Push Event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1600,
+        200
+      ],
+      "webhookId": "github-push-sync-webhook-id"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"success\",\n  \"message\": \"Git sync pipeline triggered successfully\",\n  \"timestamp\": \"{{ $now.toISO() }}\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-sync-respond-webhook",
+      "name": "Respond to Webhook - 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -1340,
+        100
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "node-sync-manual-trigger",
+      "name": "Manual Trigger - Force Sync",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1600,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const webhookBody = $('Webhook - GitHub Push Event').item?.json?.body || {};\n\n// Default settings (Override these or pass via GitHub Webhook)\nconst DEFAULT_OWNER  = 'jjms95';\nconst DEFAULT_REPO   = 'n8n-commerce-flows';\nconst DEFAULT_BRANCH = 'main';\nconst N8N_BASE_URL   = 'http://127.0.0.1:5678'; // Or internal n8n URL\nconst AUTO_ACTIVATE  = false; // User controls activation manually\n\nlet repoOwner  = DEFAULT_OWNER;\nlet repoName   = DEFAULT_REPO;\nlet branchName = DEFAULT_BRANCH;\n\nif (webhookBody.repository) {\n  repoName = webhookBody.repository.name || DEFAULT_REPO;\n  repoOwner = (webhookBody.repository.owner && webhookBody.repository.owner.login) ? webhookBody.repository.owner.login : DEFAULT_OWNER;\n  if (webhookBody.ref) {\n    branchName = webhookBody.ref.replace('refs/heads/', '');\n  }\n}\n\nreturn {\n  repo_owner: repoOwner,\n  repo_name: repoName,\n  branch: branchName,\n  n8n_base_url: N8N_BASE_URL,\n  auto_activate: AUTO_ACTIVATE,\n  sync_source: webhookBody.repository ? 'github_push_webhook' : 'manual_execution'\n};"
+      },
+      "id": "node-sync-config",
+      "name": "Code - Initialize Sync Configuration",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json.repo_owner }}/{{ $json.repo_name }}/git/trees/{{ $json.branch }}?recursive=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-git-sync-agent"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-sync-github-tree",
+      "name": "HTTP - Fetch GitHub Repo Tree",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1080,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Code - Initialize Sync Configuration').item.json;\nconst treeData = $input.item.json.tree || [];\n\n// Filter only workflow JSON files (root or subfolders, excluding package/config files)\nconst workflowFiles = treeData.filter(item => {\n  if (item.type !== 'blob') return false;\n  const path = item.path.toLowerCase();\n  if (!path.endsWith('.json')) return false;\n  if (path.includes('package') || path.includes('tsconfig') || path.includes('mcp_config') || path.includes('hooks.json') || path.includes('n8n_git_sync')) return false;\n  return true;\n});\n\nif (workflowFiles.length === 0) {\n  return [];\n}\n\nreturn workflowFiles.map(file => ({\n  file_path: file.path,\n  file_sha: file.sha,\n  raw_url: `https://raw.githubusercontent.com/${cfg.repo_owner}/${cfg.repo_name}/${cfg.branch}/${file.path}`,\n  config: cfg\n}));"
+      },
+      "id": "node-sync-filter-json",
+      "name": "Code - Filter Workflow JSON Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -840,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.raw_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "n8n-git-sync-agent"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-sync-fetch-raw-json",
+      "name": "HTTP - Download Workflow File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Code - Initialize Sync Configuration').item.json.n8n_base_url }}/api/v1/workflows",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-API-KEY",
+              "value": "YOUR_N8N_PUBLIC_API_KEY"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-sync-fetch-existing-n8n-workflows",
+      "name": "HTTP - List Existing N8N Workflows",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -360,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fileItem = $('HTTP - Download Workflow File').item.json;\nconst fileMeta = $('Code - Filter Workflow JSON Files').item.json;\nconst existingRes = $('HTTP - List Existing N8N Workflows').first()?.json?.data || [];\n\nlet parsedWorkflow = fileItem;\nif (typeof fileItem === 'string') {\n  try { parsedWorkflow = JSON.parse(fileItem); } catch(e) {}\n}\n\nif (!parsedWorkflow || !parsedWorkflow.nodes || !Array.isArray(parsedWorkflow.nodes)) {\n  return {\n    valid: false,\n    file_path: fileMeta.file_path,\n    error: 'File does not contain a valid n8n workflow structure (nodes array missing)'\n  };\n}\n\nconst workflowName = parsedWorkflow.name || fileMeta.file_path.replace('.json', '');\nconst existingWf = existingRes.find(w => w.name === workflowName || w.name === parsedWorkflow.name);\n\nreturn {\n  valid: true,\n  action: existingWf ? 'UPDATE' : 'CREATE',\n  existing_id: existingWf ? existingWf.id : null,\n  workflow_name: workflowName,\n  file_path: fileMeta.file_path,\n  nodes: parsedWorkflow.nodes,\n  connections: parsedWorkflow.connections || {},\n  settings: parsedWorkflow.settings || { executionOrder: 'v1' },\n  tags: parsedWorkflow.tags || [],\n  auto_activate: fileMeta.config.auto_activate\n};"
+      },
+      "id": "node-sync-match-workflows",
+      "name": "Code - Match & Prepare Upsert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true
+          },
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-sync-if-valid",
+      "name": "IF - Is Valid Workflow JSON?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true
+          },
+          "conditions": [
+            {
+              "id": "cond-action",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "UPDATE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-sync-if-update-or-create",
+      "name": "IF - Update or Create?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        320,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $('Code - Initialize Sync Configuration').item.json.n8n_base_url }}/api/v1/workflows/{{ $json.existing_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-API-KEY",
+              "value": "YOUR_N8N_PUBLIC_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({\n  name: $json.workflow_name,\n  nodes: $json.nodes,\n  connections: $json.connections,\n  settings: $json.settings\n}) }}",
+        "options": {}
+      },
+      "id": "node-sync-put-update-workflow",
+      "name": "HTTP - Update Workflow in N8N",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Code - Initialize Sync Configuration').item.json.n8n_base_url }}/api/v1/workflows",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-API-KEY",
+              "value": "YOUR_N8N_PUBLIC_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({\n  name: $json.workflow_name,\n  nodes: $json.nodes,\n  connections: $json.connections,\n  settings: $json.settings\n}) }}",
+        "options": {}
+      },
+      "id": "node-sync-post-create-workflow",
+      "name": "HTTP - Create Workflow in N8N",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\nconst cfg = $('Code - Initialize Sync Configuration').item.json;\n\nreturn {\n  status: 'completed',\n  repo: `${cfg.repo_owner}/${cfg.repo_name}`,\n  branch: cfg.branch,\n  synchronized_workflows_count: items.length,\n  workflows: items.map(w => ({\n    name: w.name || w.workflow_name,\n    id: w.id || w.existing_id,\n    active: w.active || false\n  })),\n  published_policy: 'Unpublished by default (manual user activation required)',\n  sync_timestamp: new Date().toISOString()\n};"
+      },
+      "id": "node-sync-summary-report",
+      "name": "Code - Build Sync Summary Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - GitHub Push Event": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook - 200 OK",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code - Initialize Sync Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger - Force Sync": {
+      "main": [
+        [
+          {
+            "node": "Code - Initialize Sync Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Initialize Sync Configuration": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Fetch GitHub Repo Tree",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP - Fetch GitHub Repo Tree": {
+      "main": [
+        [
+          {
+            "node": "Code - Filter Workflow JSON Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Filter Workflow JSON Files": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Download Workflow File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP - Download Workflow File": {
+      "main": [
+        [
+          {
+            "node": "HTTP - List Existing N8N Workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP - List Existing N8N Workflows": {
+      "main": [
+        [
+          {
+            "node": "Code - Match & Prepare Upsert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Match & Prepare Upsert": {
+      "main": [
+        [
+          {
+            "node": "IF - Is Valid Workflow JSON?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Is Valid Workflow JSON?": {
+      "main": [
+        [
+          {
+            "node": "IF - Update or Create?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Update or Create?": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Update Workflow in N8N",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP - Create Workflow in N8N",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP - Update Workflow in N8N": {
+      "main": [
+        [
+          {
+            "node": "Code - Build Sync Summary Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP - Create Workflow in N8N": {
+      "main": [
+        [
+          {
+            "node": "Code - Build Sync Summary Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
