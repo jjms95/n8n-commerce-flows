@@ -48,7 +48,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const webhookBody = $('Webhook - GitHub Push Event').item?.json?.body || {};\n\n// Default settings (Override these or pass via GitHub Webhook)\nconst DEFAULT_OWNER  = 'jjms95';\nconst DEFAULT_REPO   = 'n8n-commerce-flows';\nconst DEFAULT_BRANCH = 'main';\nconst N8N_BASE_URL   = 'http://127.0.0.1:5678'; // Or internal n8n URL\nconst AUTO_ACTIVATE  = false; // User controls activation manually\n\nlet repoOwner  = DEFAULT_OWNER;\nlet repoName   = DEFAULT_REPO;\nlet branchName = DEFAULT_BRANCH;\n\nif (webhookBody.repository) {\n  repoName = webhookBody.repository.name || DEFAULT_REPO;\n  repoOwner = (webhookBody.repository.owner && webhookBody.repository.owner.login) ? webhookBody.repository.owner.login : DEFAULT_OWNER;\n  if (webhookBody.ref) {\n    branchName = webhookBody.ref.replace('refs/heads/', '');\n  }\n}\n\nreturn {\n  repo_owner: repoOwner,\n  repo_name: repoName,\n  branch: branchName,\n  n8n_base_url: N8N_BASE_URL,\n  auto_activate: AUTO_ACTIVATE,\n  sync_source: webhookBody.repository ? 'github_push_webhook' : 'manual_execution'\n};"
+        "jsCode": "// Safely read input regardless of whether execution started from Manual Trigger or Webhook\nlet inputJson = {};\ntry {\n  inputJson = $input.first() ? $input.first().json : {};\n} catch(e) {}\nconst webhookBody = inputJson.body || inputJson || {};\n\n// Default settings (Override these or pass via GitHub Webhook)\nconst DEFAULT_OWNER  = 'jjms95';\nconst DEFAULT_REPO   = 'n8n-commerce-flows';\nconst DEFAULT_BRANCH = 'main';\nconst N8N_BASE_URL   = 'http://127.0.0.1:5678'; // Or internal n8n URL\nconst AUTO_ACTIVATE  = false; // User controls activation manually\n\nlet repoOwner  = DEFAULT_OWNER;\nlet repoName   = DEFAULT_REPO;\nlet branchName = DEFAULT_BRANCH;\n\nif (webhookBody.repository) {\n  repoName = webhookBody.repository.name || DEFAULT_REPO;\n  repoOwner = (webhookBody.repository.owner && webhookBody.repository.owner.login) ? webhookBody.repository.owner.login : DEFAULT_OWNER;\n  if (webhookBody.ref) {\n    branchName = webhookBody.ref.replace('refs/heads/', '');\n  }\n}\n\nreturn {\n  repo_owner: repoOwner,\n  repo_name: repoName,\n  branch: branchName,\n  n8n_base_url: N8N_BASE_URL,\n  auto_activate: AUTO_ACTIVATE,\n  sync_source: webhookBody.repository ? 'github_push_webhook' : 'manual_execution'\n};"
       },
       "id": "node-sync-config",
       "name": "Code - Initialize Sync Configuration",
@@ -61,7 +61,34 @@
     },
     {
       "parameters": {
-        "url": "=https://api.github.com/repos/{{ $json.repo_owner }}/{{ $json.repo_name }}/git/trees/{{ $json.branch }}?recursive=1",
+        "url": "={{ $json.n8n_base_url }}/api/v1/workflows",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-API-KEY",
+              "value": "YOUR_N8N_PUBLIC_API_KEY"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-sync-fetch-existing-n8n-workflows",
+      "name": "HTTP - List Existing N8N Workflows",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Code - Initialize Sync Configuration').item.json.repo_owner }}/{{ $('Code - Initialize Sync Configuration').item.json.repo_name }}/git/trees/{{ $('Code - Initialize Sync Configuration').item.json.branch }}?recursive=1",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -82,7 +109,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -1080,
+        -860,
         300
       ]
     },
@@ -95,7 +122,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -840,
+        -620,
         300
       ]
     },
@@ -118,47 +145,20 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -600,
+        -380,
         300
       ]
     },
     {
       "parameters": {
-        "url": "={{ $('Code - Initialize Sync Configuration').item.json.n8n_base_url }}/api/v1/workflows",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "X-N8N-API-KEY",
-              "value": "YOUR_N8N_PUBLIC_API_KEY"
-            },
-            {
-              "name": "Accept",
-              "value": "application/json"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "node-sync-fetch-existing-n8n-workflows",
-      "name": "HTTP - List Existing N8N Workflows",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        -360,
-        180
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const fileItem = $('HTTP - Download Workflow File').item.json;\nconst fileMeta = $('Code - Filter Workflow JSON Files').item.json;\nconst existingRes = $('HTTP - List Existing N8N Workflows').first()?.json?.data || [];\n\nlet parsedWorkflow = fileItem;\nif (typeof fileItem === 'string') {\n  try { parsedWorkflow = JSON.parse(fileItem); } catch(e) {}\n}\n\nif (!parsedWorkflow || !parsedWorkflow.nodes || !Array.isArray(parsedWorkflow.nodes)) {\n  return {\n    valid: false,\n    file_path: fileMeta.file_path,\n    error: 'File does not contain a valid n8n workflow structure (nodes array missing)'\n  };\n}\n\nconst workflowName = parsedWorkflow.name || fileMeta.file_path.replace('.json', '');\nconst existingWf = existingRes.find(w => w.name === workflowName || w.name === parsedWorkflow.name);\n\nreturn {\n  valid: true,\n  action: existingWf ? 'UPDATE' : 'CREATE',\n  existing_id: existingWf ? existingWf.id : null,\n  workflow_name: workflowName,\n  file_path: fileMeta.file_path,\n  nodes: parsedWorkflow.nodes,\n  connections: parsedWorkflow.connections || {},\n  settings: parsedWorkflow.settings || { executionOrder: 'v1' },\n  tags: parsedWorkflow.tags || [],\n  auto_activate: fileMeta.config.auto_activate\n};"
+        "jsCode": "const fileItem = $input.item.json;\nconst fileMeta = $('Code - Filter Workflow JSON Files').item.json;\nconst existingRes = $('HTTP - List Existing N8N Workflows').first()?.json?.data || [];\n\nlet parsedWorkflow = fileItem;\nif (typeof fileItem === 'string') {\n  try { parsedWorkflow = JSON.parse(fileItem); } catch(e) {}\n}\n\nif (!parsedWorkflow || !parsedWorkflow.nodes || !Array.isArray(parsedWorkflow.nodes)) {\n  return {\n    valid: false,\n    file_path: fileMeta.file_path,\n    error: 'File does not contain a valid n8n workflow structure (nodes array missing)'\n  };\n}\n\nconst workflowName = parsedWorkflow.name || fileMeta.file_path.replace('.json', '');\nconst existingWf = existingRes.find(w => w.name === workflowName || w.name === parsedWorkflow.name);\n\nreturn {\n  valid: true,\n  action: existingWf ? 'UPDATE' : 'CREATE',\n  existing_id: existingWf ? existingWf.id : null,\n  workflow_name: workflowName,\n  file_path: fileMeta.file_path,\n  nodes: parsedWorkflow.nodes,\n  connections: parsedWorkflow.connections || {},\n  settings: parsedWorkflow.settings || { executionOrder: 'v1' },\n  tags: parsedWorkflow.tags || [],\n  auto_activate: fileMeta.config.auto_activate\n};"
       },
       "id": "node-sync-match-workflows",
       "name": "Code - Match & Prepare Upsert",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -120,
+        -140,
         300
       ]
     },
@@ -188,7 +188,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        100,
+        80,
         300
       ]
     },
@@ -218,7 +218,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        320,
+        300,
         220
       ]
     },
@@ -250,7 +250,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        560,
+        540,
         140
       ]
     },
@@ -282,7 +282,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        560,
+        540,
         320
       ]
     },
@@ -295,7 +295,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        820,
+        800,
         220
       ]
     }
@@ -333,6 +333,17 @@
       "main": [
         [
           {
+            "node": "HTTP - List Existing N8N Workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP - List Existing N8N Workflows": {
+      "main": [
+        [
+          {
             "node": "HTTP - Fetch GitHub Repo Tree",
             "type": "main",
             "index": 0
@@ -363,17 +374,6 @@
       ]
     },
     "HTTP - Download Workflow File": {
-      "main": [
-        [
-          {
-            "node": "HTTP - List Existing N8N Workflows",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "HTTP - List Existing N8N Workflows": {
       "main": [
         [
           {
