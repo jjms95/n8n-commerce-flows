@@ -356,42 +356,6 @@
     },
     {
       "parameters": {
-        "operation": "delete",
-        "tableId": "products",
-        "matchType": "allFilters",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "tenant_id",
-              "condition": "eq",
-              "keyValue": "={{ $json.tenant_id }}"
-            },
-            {
-              "keyName": "name",
-              "condition": "ilike",
-              "keyValue": "={{ $json.product_name ? $json.product_name : \"%\" }}"
-            }
-          ]
-        }
-      },
-      "id": "node-f2-delete-product",
-      "name": "Supabase - Delete Product",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        140,
-        540
-      ],
-      "credentials": {
-        "supabaseApi": {
-          "id": "npXBeQbUWAELw9JL",
-          "name": "Supabase account"
-        }
-      },
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
         "tableId": "rpc/adjust_product_stock",
         "fieldsUi": {
           "fieldValues": [
@@ -428,14 +392,14 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('Code - Parse CRUD Intent').item.json;\nconst rawDbOut = $input.all().map(i => i.json);\nconst dbOut = rawDbOut.filter(p => p && (p.id || p.name || p.success !== undefined));\nlet message = '';\nlet buttons = [];\n\nswitch (ctx.action) {\n  case 'LIST': {\n    if (!dbOut || dbOut.length === 0) {\n      message = `📦 *INVENTARIO DE PRODUCTOS (0)*\\n` +\n        `🏢 *${ctx.tenant_name || 'Negocio'}*\\n\\n` +\n        `_No tienes productos activos registrados en tu catálogo actualmente._\\n\\n` +\n        `━━━━━━━━━━━━━━━━━━━━\\n` +\n        `✨ *¿CÓMO CREAR UN PRODUCTO?*\\n` +\n        `Escribe directamente un mensaje como:\\n` +\n        `👉 \\`crear producto Camisa Azul precio 120000 stock 25\\`\\n` +\n        `👉 \\`crear producto Zapatos por 250 mil con 10 unidades\\``;\n        \n      buttons = [\n        { id: \"tareas\", title: \"📋 Ver Tareas\" },\n        { id: \"reporte\", title: \"📊 Ver Reporte\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    } else if (dbOut.length === 1) {\n      const p = dbOut[0];\n      const stockStatus = p.stock === 0 ? ' ❌ *Agotado*' : (p.stock < 5 ? ' ⚠️ *Stock Bajo*' : ' ✅ *Disponible*');\n      \n      message = `📦 *INVENTARIO DE PRODUCTOS (1)*\\n` +\n        `🏢 *${ctx.tenant_name || 'Negocio'}*\\n\\n` +\n        `*1. ${p.name}*\\n` +\n        `   💰 *Precio:* $${parseFloat(p.price || 0).toLocaleString('es-CO')} COP\\n` +\n        `   📊 *Stock:* ${p.stock} unidades (${stockStatus})\\n\\n` +\n        `━━━━━━━━━━━━━━━━━━━━\\n` +\n        `👇 *Acciones rápidas 1-clic para este producto:*`;\n\n      buttons = [\n        { id: `agregar stock 5 a ${p.name}`, title: \"➕ +5 Stock\" },\n        { id: `restar stock 1 a ${p.name}`, title: \"➖ -1 Stock\" },\n        { id: `eliminar producto ${p.name}`, title: \"🗑️ Eliminar\" }\n      ];\n    } else {\n      const items = dbOut.map((p, idx) => {\n        const stockStatus = p.stock === 0 ? ' ❌ *Agotado*' : (p.stock < 5 ? ' ⚠️ *Stock Bajo*' : ' ✅ *Disponible*');\n        return `*${idx + 1}. ${p.name}*\\n` +\n               `   💰 *Precio:* $${parseFloat(p.price || 0).toLocaleString('es-CO')} COP\\n` +\n               `   📊 *Stock:* ${p.stock} unidades (${stockStatus})`;\n      }).join('\\n\\n');\n\n      const firstProd = dbOut[0].name;\n\n      message = `📦 *INVENTARIO DE PRODUCTOS (${dbOut.length})*\\n` +\n        `🏢 *${ctx.tenant_name || 'Negocio'}*\\n\\n` +\n        `${items}\\n\\n` +\n        `━━━━━━━━━━━━━━━━━━━━\\n` +\n        `💡 *ACCIONES RÁPIDAS:*\\n` +\n        `• ➕ *Sumar:* \\`agregar stock 10 a ${firstProd}\\`\\n` +\n        `• ➖ *Restar:* \\`restar stock 5 a ${firstProd}\\`\\n` +\n        `• 💲 *Precio:* \\`cambiar precio de ${firstProd} a 450000\\`\\n` +\n        `• 🗑️ *Eliminar:* \\`eliminar producto ${firstProd}\\`\\n` +\n        `• 🆕 *Crear:* \\`crear producto <nombre> precio <precio> stock <cant>\\``;\n\n      buttons = [\n        { id: `agregar stock 5 a ${firstProd}`, title: `➕ +5 a ${firstProd.slice(0, 10)}` },\n        { id: `eliminar producto ${firstProd}`, title: `🗑️ Borrar ${firstProd.slice(0, 8)}` },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    }\n    break;\n  }\n  case 'CREATE': {\n    const created = dbOut[0] || {};\n    const prodName = created.name || ctx.product_name;\n    message = `✅ *PRODUCTO CREADO EXITOSAMENTE*\\n\\n` +\n      `📦 *Nombre:* ${prodName}\\n` +\n      `💰 *Precio:* $${parseFloat(created.price || ctx.price || 0).toLocaleString('es-CO')} COP\\n` +\n      `📊 *Stock inicial:* ${created.stock !== undefined ? created.stock : ctx.stock} unidades\\n\\n` +\n      `💡 _Tus clientes ya pueden buscar y comprar este producto en tu tienda._`;\n      \n    buttons = [\n      { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n      { id: `agregar stock 10 a ${prodName}`, title: \"➕ Sumar +10 Stock\" },\n      { id: `eliminar producto ${prodName}`, title: \"🗑️ Eliminar\" }\n    ];\n    break;\n  }\n  case 'UPDATE_PRICE': {\n    if (!dbOut || dbOut.length === 0) {\n      message = `❌ *No se encontró el producto:* No pudimos encontrar un producto con el nombre *\"${ctx.product_name}\"* para actualizar su precio.\\n\\n💡 _Escribe_ \\`ver inventario\\` _para consultar los nombres exactos._`;\n      buttons = [\n        { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    } else {\n      message = `✅ *PRECIO ACTUALIZADO EXITOSAMENTE*\\n\\n` +\n        `📦 *Producto:* ${ctx.product_name}\\n` +\n        `💰 *Nuevo Precio:* $${ctx.price.toLocaleString('es-CO')} COP`;\n        \n      buttons = [\n        { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n        { id: `agregar stock 5 a ${ctx.product_name}`, title: \"➕ Ajustar Stock\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    }\n    break;\n  }\n  case 'DELETE': {\n    if (!dbOut || dbOut.length === 0) {\n      message = `❌ *No se encontró el producto:* No pudimos encontrar un producto con el nombre *\"${ctx.product_name}\"* para retirarlo.\\n\\n💡 _Escribe_ \\`ver inventario\\` _para ver tu lista activa._`;\n    } else {\n      message = `🗑️ *PRODUCTO ELIMINADO CON ÉXITO*\\n\\n` +\n        `El producto *${ctx.product_name}* ha sido desactivado y retirado de tu catálogo activo.`;\n    }\n    buttons = [\n      { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n      { id: \"tareas\", title: \"📋 Ver Tareas\" },\n      { id: \"menu\", title: \"🏠 Menú Principal\" }\n    ];\n    break;\n  }\n  case 'ADJUST_STOCK': {\n    const rpcRes = dbOut[0] || {};\n    const prodName = rpcRes.product_name || ctx.product_name;\n    if (rpcRes.success) {\n      const diff = ctx.quantity_change > 0 ? `+${ctx.quantity_change}` : `${ctx.quantity_change}`;\n      message = `📊 *STOCK ACTUALIZADO EXITOSAMENTE*\\n\\n` +\n        `📦 *Producto:* ${prodName}\\n` +\n        `🔄 *Ajuste aplicado:* ${diff} unidades\\n` +\n        `📈 *Nuevo Stock Total:* *${rpcRes.new_stock} unidades*`;\n        \n      buttons = [\n        { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n        { id: `agregar stock 5 a ${prodName}`, title: \"➕ +5 Más\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    } else {\n      message = `❌ *Error al ajustar stock:* ${rpcRes.error || 'No se encontró el producto o el stock resultante sería negativo.'}\\n\\n💡 _Verifica el nombre con_ \\`ver inventario\\`.`;\n      buttons = [\n        { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    }\n    break;\n  }\n  default:\n    message = `ℹ️ Acción de catálogo completada.`;\n    buttons = [\n      { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n      { id: \"menu\", title: \"🏠 Menú Principal\" }\n    ];\n}\n\nreturn {\n  wa_number: ctx.wa_number,\n  wa_message: message,\n  buttons: buttons,\n  phone_number_id: ctx.whatsapp_phone_number_id,\n  access_token: ctx.whatsapp_access_token\n};"
+        "jsCode": "const ctx = $('Code - Parse CRUD Intent').item.json;\nconst rawDbOut = $input.all().map(i => i.json);\nconst dbOut = rawDbOut.filter(p => p && (p.id || p.name || p.success !== undefined || p.deleted_success !== undefined));\nlet message = '';\nlet buttons = [];\n\nswitch (ctx.action) {\n  case 'LIST': {\n    if (!dbOut || dbOut.length === 0) {\n      message = `📦 *INVENTARIO DE PRODUCTOS (0)*\\n` +\n        `🏢 *${ctx.tenant_name || 'Negocio'}*\\n\\n` +\n        `_No tienes productos activos registrados en tu catálogo actualmente._\\n\\n` +\n        `━━━━━━━━━━━━━━━━━━━━\\n` +\n        `✨ *¿CÓMO CREAR UN PRODUCTO?*\\n` +\n        `Escribe directamente un mensaje como:\\n` +\n        `👉 \\`crear producto Camisa Azul precio 120000 stock 25\\`\\n` +\n        `👉 \\`crear producto Zapatos por 250 mil con 10 unidades\\``;\n        \n      buttons = [\n        { id: \"tareas\", title: \"📋 Ver Tareas\" },\n        { id: \"reporte\", title: \"📊 Ver Reporte\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    } else if (dbOut.length === 1) {\n      const p = dbOut[0];\n      const stockStatus = p.stock === 0 ? ' ❌ *Agotado*' : (p.stock < 5 ? ' ⚠️ *Stock Bajo*' : ' ✅ *Disponible*');\n      \n      message = `📦 *INVENTARIO DE PRODUCTOS (1)*\\n` +\n        `🏢 *${ctx.tenant_name || 'Negocio'}*\\n\\n` +\n        `*1. ${p.name}*\\n` +\n        `   💰 *Precio:* $${parseFloat(p.price || 0).toLocaleString('es-CO')} COP\\n` +\n        `   📊 *Stock:* ${p.stock} unidades (${stockStatus})\\n\\n` +\n        `━━━━━━━━━━━━━━━━━━━━\\n` +\n        `👇 *Acciones rápidas 1-clic para este producto:*`;\n\n      buttons = [\n        { id: `agregar stock 5 a ${p.name}`, title: \"➕ +5 Stock\" },\n        { id: `restar stock 1 a ${p.name}`, title: \"➖ -1 Stock\" },\n        { id: `eliminar producto ${p.name}`, title: \"🗑️ Eliminar\" }\n      ];\n    } else {\n      const items = dbOut.map((p, idx) => {\n        const stockStatus = p.stock === 0 ? ' ❌ *Agotado*' : (p.stock < 5 ? ' ⚠️ *Stock Bajo*' : ' ✅ *Disponible*');\n        return `*${idx + 1}. ${p.name}*\\n` +\n               `   💰 *Precio:* $${parseFloat(p.price || 0).toLocaleString('es-CO')} COP\\n` +\n               `   📊 *Stock:* ${p.stock} unidades (${stockStatus})`;\n      }).join('\\n\\n');\n\n      const firstProd = dbOut[0].name;\n\n      message = `📦 *INVENTARIO DE PRODUCTOS (${dbOut.length})*\\n` +\n        `🏢 *${ctx.tenant_name || 'Negocio'}*\\n\\n` +\n        `${items}\\n\\n` +\n        `━━━━━━━━━━━━━━━━━━━━\\n` +\n        `💡 *ACCIONES RÁPIDAS:*\\n` +\n        `• ➕ *Sumar:* \\`agregar stock 10 a ${firstProd}\\`\\n` +\n        `• ➖ *Restar:* \\`restar stock 5 a ${firstProd}\\`\\n` +\n        `• 💲 *Precio:* \\`cambiar precio de ${firstProd} a 450000\\`\\n` +\n        `• 🗑️ *Eliminar:* \\`eliminar producto ${firstProd}\\`\\n` +\n        `• 🆕 *Crear:* \\`crear producto <nombre> precio <precio> stock <cant>\\``;\n\n      buttons = [\n        { id: `agregar stock 5 a ${firstProd}`, title: `➕ +5 a ${firstProd.slice(0, 10)}` },\n        { id: `eliminar producto ${firstProd}`, title: `🗑️ Borrar ${firstProd.slice(0, 8)}` },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    }\n    break;\n  }\n  case 'CREATE': {\n    const created = dbOut[0] || {};\n    const prodName = created.name || ctx.product_name;\n    message = `✅ *PRODUCTO CREADO EXITOSAMENTE*\\n\\n` +\n      `📦 *Nombre:* ${prodName}\\n` +\n      `💰 *Precio:* $${parseFloat(created.price || ctx.price || 0).toLocaleString('es-CO')} COP\\n` +\n      `📊 *Stock inicial:* ${created.stock !== undefined ? created.stock : ctx.stock} unidades\\n\\n` +\n      `💡 _Tus clientes ya pueden buscar y comprar este producto en tu tienda._`;\n      \n    buttons = [\n      { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n      { id: `agregar stock 10 a ${prodName}`, title: \"➕ Sumar +10 Stock\" },\n      { id: `eliminar producto ${prodName}`, title: \"🗑️ Eliminar\" }\n    ];\n    break;\n  }\n  case 'UPDATE_PRICE': {\n    if (!dbOut || dbOut.length === 0) {\n      message = `❌ *No se encontró el producto:* No pudimos encontrar un producto con el nombre *\"${ctx.product_name}\"* para actualizar su precio.\\n\\n💡 _Escribe_ \\`ver inventario\\` _para consultar los nombres exactos._`;\n      buttons = [\n        { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    } else {\n      message = `✅ *PRECIO ACTUALIZADO EXITOSAMENTE*\\n\\n` +\n        `📦 *Producto:* ${ctx.product_name}\\n` +\n        `💰 *Nuevo Precio:* $${ctx.price.toLocaleString('es-CO')} COP`;\n        \n      buttons = [\n        { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n        { id: `agregar stock 5 a ${ctx.product_name}`, title: \"➕ Ajustar Stock\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    }\n    break;\n  }\n  case 'DELETE': {\n    const filterRes = $('Code - Filter Products to Deactivate').all().map(i => i.json);\n    const validDeletions = filterRes.filter(p => p.deleted_success !== false && p.id);\n    \n    if (validDeletions.length === 0) {\n      message = `❌ *No se encontró el producto:* No encontramos ningún producto que coincida con *\"${ctx.product_name || 'el término solicitado'}\"* para retirar.\\n\\n💡 _Escribe_ \\`ver inventario\\` _para verificar los nombres exactos._`;\n    } else {\n      const names = validDeletions.map(p => p.name).join(', ');\n      message = `🗑️ *PRODUCTO ELIMINADO CON ÉXITO*\\n\\n` +\n        `Se ha desactivado y retirado de tu catálogo activo: *${names}*.`;\n    }\n    buttons = [\n      { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n      { id: \"tareas\", title: \"📋 Ver Tareas\" },\n      { id: \"menu\", title: \"🏠 Menú Principal\" }\n    ];\n    break;\n  }\n  case 'ADJUST_STOCK': {\n    const rpcRes = dbOut[0] || {};\n    const prodName = rpcRes.product_name || ctx.product_name;\n    if (rpcRes.success) {\n      const diff = ctx.quantity_change > 0 ? `+${ctx.quantity_change}` : `${ctx.quantity_change}`;\n      message = `📊 *STOCK ACTUALIZADO EXITOSAMENTE*\\n\\n` +\n        `📦 *Producto:* ${prodName}\\n` +\n        `🔄 *Ajuste aplicado:* ${diff} unidades\\n` +\n        `📈 *Nuevo Stock Total:* *${rpcRes.new_stock} unidades*`;\n        \n      buttons = [\n        { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n        { id: `agregar stock 5 a ${prodName}`, title: \"➕ +5 Más\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    } else {\n      message = `❌ *Error al ajustar stock:* ${rpcRes.error || 'No se encontró el producto o el stock resultante sería negativo.'}\\n\\n💡 _Verifica el nombre con_ \\`ver inventario\\`.`;\n      buttons = [\n        { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    }\n    break;\n  }\n  default:\n    message = `ℹ️ Acción de catálogo completada.`;\n    buttons = [\n      { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n      { id: \"menu\", title: \"🏠 Menú Principal\" }\n    ];\n}\n\nreturn {\n  wa_number: ctx.wa_number,\n  wa_message: message,\n  buttons: buttons,\n  phone_number_id: ctx.whatsapp_phone_number_id,\n  access_token: ctx.whatsapp_access_token\n};"
       },
       "id": "node-f2-format-response",
       "name": "Code - Format CRUD Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        380,
+        560,
         390
       ]
     },
@@ -467,9 +431,99 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        600,
+        780,
         390
       ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "products",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "tenant_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.tenant_id }}"
+            },
+            {
+              "keyName": "is_active",
+              "condition": "eq",
+              "keyValue": "true"
+            }
+          ]
+        }
+      },
+      "id": "node-f2-find-to-delete",
+      "name": "Supabase - Find Products to Delete",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        0,
+        540
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "npXBeQbUWAELw9JL",
+          "name": "Supabase account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Code - Parse CRUD Intent').item.json;\nconst rawProducts = $input.all().map(i => i.json).filter(p => p && p.id && p.name);\nconst target = (ctx.product_name || '').toLowerCase().trim();\n\nlet matched = [];\n\nif (!target || target === 'todo' || target === 'todos' || target === '%') {\n  // Delete all active products for tenant\n  matched = rawProducts;\n} else if (/^\\d+$/.test(target)) {\n  // Delete by 1-based index (e.g. \"eliminar 1\")\n  const idx = parseInt(target, 10) - 1;\n  if (rawProducts[idx]) matched = [rawProducts[idx]];\n} else {\n  // Match by exact or partial name\n  matched = rawProducts.filter(p => {\n    const pName = (p.name || '').toLowerCase();\n    return pName.includes(target) || target.includes(pName);\n  });\n}\n\nif (matched.length === 0) {\n  // If no match by partial, check if there's only 1 product total in database\n  if (rawProducts.length === 1 && (target.includes('camisa') || target.includes('crear') || target.includes('producto'))) {\n    matched = rawProducts;\n  }\n}\n\nif (matched.length === 0) {\n  return [{\n    json: {\n      deleted_success: false,\n      product_name: ctx.product_name,\n      deleted_items: []\n    }\n  }];\n}\n\nreturn matched.map(p => ({\n  json: {\n    id: p.id,\n    name: p.name,\n    is_active: \"false\",\n    deleted_success: true,\n    product_name: p.name\n  }\n}));"
+      },
+      "id": "node-f2-filter-deactivate",
+      "name": "Code - Filter Products to Deactivate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        180,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "products",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "is_active",
+              "fieldValue": "false"
+            },
+            {
+              "fieldId": "stock",
+              "fieldValue": "0"
+            }
+          ]
+        }
+      },
+      "id": "node-f2-deactivate-by-id",
+      "name": "Supabase - Deactivate Products by ID",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        360,
+        540
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "npXBeQbUWAELw9JL",
+          "name": "Supabase account"
+        }
+      },
+      "alwaysOutputData": true
     }
   ],
   "pinData": {},
@@ -576,7 +630,7 @@
         ],
         [
           {
-            "node": "Supabase - Delete Product",
+            "node": "Supabase - Find Products to Delete",
             "type": "main",
             "index": 0
           }
@@ -645,7 +699,29 @@
         ]
       ]
     },
-    "Supabase - Delete Product": {
+    "Supabase - Find Products to Delete": {
+      "main": [
+        [
+          {
+            "node": "Code - Filter Products to Deactivate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Filter Products to Deactivate": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Deactivate Products by ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Deactivate Products by ID": {
       "main": [
         [
           {
