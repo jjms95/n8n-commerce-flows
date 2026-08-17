@@ -1,5 +1,5 @@
 {
-  "name": "Flujo 4 - Agendamiento de Citas",
+  "name": "Flow 4 - Appointment Booking & Anti-Collision",
   "nodes": [
     {
       "parameters": {
@@ -11,7 +11,7 @@
             },
             {
               "name": "message",
-              "stringValue": "Quiero agendar una cita para el jueves 10 de agosto a las 3pm para revisi\u00f3n de pedido"
+              "stringValue": "Quiero agendar una cita para el jueves 10 de agosto a las 3pm para revisión de pedido"
             },
             {
               "name": "sender_type",
@@ -22,11 +22,35 @@
         "options": {}
       },
       "id": "trigger-manual-appointments",
-      "name": "Manual Trigger - Solicitud de Cita",
+      "name": "Manual Trigger - Appointment Request",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
         240,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "exec-wf-trigger-f4",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item.json;\nconst tenant = item.tenant || {};\nconst sender = item.sender || {};\nconst msg = item.message || {};\n\nconst text = msg.text || item.original_message || item.message || '';\nconst number = sender.number || tenant.number || item.number || '521234567890';\nconst senderType = sender.type || item.sender_type || 'client';\n\nreturn {\n  message: text,\n  number: number,\n  sender_type: senderType,\n  tenant: tenant,\n  sender: sender\n};"
+      },
+      "id": "code-norm-f4",
+      "name": "Code - Normalize Inbound Appointment Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
         300
       ]
     },
@@ -71,7 +95,7 @@
         }
       },
       "id": "ai-agent-appointments",
-      "name": "AI Agent - Extraer Datos de Cita",
+      "name": "AI Agent - Extract Appointment Details",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
@@ -81,10 +105,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const rawOutput  = $input.item.json.output || $input.item.json.text || '{}';\nconst triggerData = $('Manual Trigger - Solicitud de Cita').item.json;\nlet parsed = {};\ntry {\n  const jsonMatch = rawOutput.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);\n} catch(e) {\n  parsed = { created_by: triggerData.sender_type, title: 'Cita sin t\u00edtulo', appointment_date: null, status: 'scheduled', is_valid: false };\n}\nreturn {\n  created_by:       parsed.created_by       || triggerData.sender_type,\n  title:            parsed.title            || 'Cita sin t\u00edtulo especificado',\n  appointment_date: parsed.appointment_date || null,\n  status:           parsed.status           || 'scheduled',\n  is_valid:         parsed.is_valid !== false,\n  sender_number:    triggerData.number\n};"
+        "jsCode": "const rawOutput  = $input.item.json.output || $input.item.json.text || '{}';\nconst triggerData = $('Code - Normalize Inbound Appointment Request').item.json;\nlet parsed = {};\ntry {\n  const jsonMatch = rawOutput.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);\n} catch(e) {\n  parsed = { created_by: triggerData.sender_type, title: 'Cita sin título', appointment_date: null, status: 'scheduled', is_valid: false };\n}\nreturn {\n  created_by:       parsed.created_by       || triggerData.sender_type,\n  title:            parsed.title            || 'Cita sin título especificado',\n  appointment_date: parsed.appointment_date || null,\n  status:           parsed.status           || 'scheduled',\n  is_valid:         parsed.is_valid !== false && !!parsed.appointment_date,\n  sender_number:    triggerData.number,\n  tenant:           triggerData.tenant,\n  sender:           triggerData.sender\n};"
       },
       "id": "parse-appointment-data",
-      "name": "Parsear Datos de Cita",
+      "name": "Code - Parse Appointment Details",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -114,7 +138,7 @@
         "options": {}
       },
       "id": "router-is-valid-appointment",
-      "name": "Router - \u00bfCita V\u00e1lida?",
+      "name": "IF - Is Valid Appointment?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -139,7 +163,7 @@
         "limit": 1
       },
       "id": "supabase-get-client-for-appt",
-      "name": "Supabase - Buscar Cliente para Cita",
+      "name": "Supabase - Lookup Client for Appointment",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -155,10 +179,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const clientData = $input.item.json;\nconst apptData   = $('Parsear Datos de Cita').item.json;\nreturn {\n  client_id:        clientData.id || null,\n  title:            apptData.title,\n  appointment_date: apptData.appointment_date,\n  status:           apptData.status,\n  created_by:       apptData.created_by,\n  sender_number:    apptData.sender_number\n};"
+        "jsCode": "const apptData   = $('Code - Parse Appointment Details').item.json;\nconst clientData = $input.item.json;\nreturn {\n  client_id:        clientData ? clientData.id : null,\n  tenant_id:        apptData.tenant ? apptData.tenant.id : (clientData ? clientData.tenant_id : null),\n  title:            apptData.title,\n  appointment_date: apptData.appointment_date,\n  status:           apptData.status || 'scheduled',\n  created_by:       apptData.created_by || 'client',\n  sender_number:    apptData.sender_number,\n  client_name:      clientData ? clientData.name : 'Cliente',\n  tenant:           apptData.tenant\n};"
       },
-      "id": "prepare-appointment-insert",
-      "name": "Preparar Insert de Cita",
+      "id": "prepare-insert-appointment",
+      "name": "Code - Prepare Appointment Insert Payload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -168,36 +192,38 @@
     },
     {
       "parameters": {
-        "operation": "create",
         "tableId": "appointments",
-        "dataToSend": "defineBelow",
         "fieldsUi": {
           "fieldValues": [
             {
-              "fieldName": "client_id",
+              "fieldId": "client_id",
               "fieldValue": "={{ $json.client_id }}"
             },
             {
-              "fieldName": "title",
+              "fieldId": "tenant_id",
+              "fieldValue": "={{ $json.tenant_id }}"
+            },
+            {
+              "fieldId": "title",
               "fieldValue": "={{ $json.title }}"
             },
             {
-              "fieldName": "appointment_date",
+              "fieldId": "appointment_date",
               "fieldValue": "={{ $json.appointment_date }}"
             },
             {
-              "fieldName": "status",
+              "fieldId": "status",
               "fieldValue": "={{ $json.status }}"
             },
             {
-              "fieldName": "created_by",
+              "fieldId": "created_by",
               "fieldValue": "={{ $json.created_by }}"
             }
           ]
         }
       },
       "id": "supabase-create-appointment",
-      "name": "Supabase - Crear Cita",
+      "name": "Supabase - Create Appointment",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -213,10 +239,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const apptRecord = $input.item.json;\nconst apptData   = $('Parsear Datos de Cita').item.json;\nconst apptDate   = new Date(apptData.appointment_date);\nconst fDate = apptDate.toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });\nconst fTime = apptDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });\nconst emoji = apptData.created_by === 'business' ? '🏢' : '👤';\n\nconst isoStart = apptDate.toISOString().replace(/-|:|\\.\\d+/g, '');\nconst endDate = new Date(apptDate.getTime() + 60 * 60 * 1000);\nconst isoEnd = endDate.toISOString().replace(/-|:|\\.\\d+/g, '');\nconst titleEncoded = encodeURIComponent(apptData.title || 'Cita Comercial');\nconst detailsEncoded = encodeURIComponent(`Cita agendada para ${apptData.title} a las ${fTime}`);\nconst gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${titleEncoded}&dates=${isoStart}/${isoEnd}&details=${detailsEncoded}`;\n\nconst confirmMsg = `📅 *CITA CONFIRMADA EXITOSAMENTE*\\n\\n${emoji} *${apptData.title}*\\n\\n🗓️ ${fDate}\\n⏰ ${fTime}\\n\\n📲 *Añadir a Google Calendar:*\\n${gcalUrl}\\n\\n_ID de Cita: ${apptRecord.id || 'N/A'}_`;\n\nconst buttons = [\n  { id: \"ver citas\", title: \"📅 Mis Citas\" },\n  { id: \"ver inventario\", title: \"🛍️ Ver Catálogo\" },\n  { id: \"menu\", title: \"🏠 Menú Principal\" }\n];\n\nreturn {\n  wa_number:    apptData.sender_number,\n  wa_message:   confirmMsg,\n  buttons:      buttons,\n  notify_admin: apptData.created_by !== 'business',\n  admin_number: ($input.item.json.tenant ? $input.item.json.tenant.number : ($apptData.tenant ? $apptData.tenant.number : '529876543210')),\n  appt_title:   apptData.title,\n  appt_date_fmt: fDate,\n  appt_time_fmt: fTime,\n  phone_number_id: ($input.item.json.tenant ? $input.item.json.tenant.whatsapp_phone_number_id : '10023456789'),\n  access_token: ($input.item.json.tenant ? $input.item.json.tenant.whatsapp_access_token : 'EAAG_DEMO_TOKEN')\n};"
+        "jsCode": "const apptRecord = $input.item.json;\nconst insertData = $('Code - Prepare Appointment Insert Payload').item.json;\nconst apptDate   = new Date(apptRecord.appointment_date || insertData.appointment_date);\n\nconst formattedDate = apptDate.toLocaleDateString('es-MX', {\n  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'\n});\nconst formattedTime = apptDate.toLocaleTimeString('es-MX', {\n  hour: '2-digit', minute: '2-digit', hour12: true\n});\n\nconst startDateIso = apptDate.toISOString().replace(/-|:|\\.\\d+/g, '');\nconst endDate      = new Date(apptDate.getTime() + 60 * 60 * 1000);\nconst endDateIso   = endDate.toISOString().replace(/-|:|\\.\\d+/g, '');\nconst gcalUrl      = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(apptRecord.title || insertData.title)}&dates=${startDateIso}/${endDateIso}&details=${encodeURIComponent('Cita agendada via WhatsApp')}`;\n\nconst confirmationMsg = `📅 *¡CITA AGENDADA EXITOSAMENTE!*\\n\\n` +\n`📌 *Asunto:* ${apptRecord.title || insertData.title}\\n` +\n`🗓️ *Fecha:* ${formattedDate}\\n` +\n`⏰ *Hora:* ${formattedTime}\\n` +\n`🔖 *Estado:* Agendada\\n\\n` +\n`📲 *Añadir a Google Calendar:*\\n${gcalUrl}\\n\\n` +\n`_Si deseas cancelar o reprogramar, indícalo por este chat._`;\n\nconst buttons = [\n  { id: \"ver citas\", title: \"📅 Mis Citas\" },\n  { id: \"ver inventario\", title: \"🛍️ Ver Catálogo\" },\n  { id: \"menu\", title: \"🏠 Menú Principal\" }\n];\n\nreturn {\n  wa_number:       insertData.sender_number,\n  wa_message:      confirmationMsg,\n  buttons:         buttons,\n  appointment_id:  apptRecord.id,\n  client_name:     insertData.client_name,\n  formatted_date:  `${formattedDate} a las ${formattedTime}`,\n  title:           apptRecord.title || insertData.title,\n  created_by:      insertData.created_by,\n  tenant:          insertData.tenant,\n  phone_number_id: (insertData.tenant ? insertData.tenant.whatsapp_phone_number_id : '10023456789'),\n  access_token:    (insertData.tenant ? insertData.tenant.whatsapp_access_token : 'EAAG_DEMO_TOKEN')\n};"
       },
       "id": "format-appointment-confirmation",
-      "name": "Formatear Confirmación de Cita",
+      "name": "Code - Format Appointment Confirmation",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -226,27 +252,14 @@
     },
     {
       "parameters": {
-        "jsCode": "const apptData = $('Parsear Datos de Cita').item.json;\nconst errorMsg = `⚠️ *No pude entender la fecha de la cita*\\n\\nPor favor intenta con este formato:\\n\\n📝 *Ejemplo:*\\n\"Quiero una cita el *martes 15 de agosto* a las *3:00 PM* para revisión\"\\n\\n¡Inténtalo de nuevo! 😊`;\nconst buttons = [\n  { id: \"menu\", title: \"🏠 Menú Principal\" },\n  { id: \"ver inventario\", title: \"🛍️ Ver Catálogo\" }\n];\nreturn { wa_number: apptData.sender_number, wa_message: errorMsg, buttons: buttons };"
-      },
-      "id": "format-appointment-error",
-      "name": "Formatear Error de Cita",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1120,
-        440
-      ]
-    },
-    {
-      "parameters": {
         "method": "POST",
-        "url": "=https://graph.facebook.com/v20.0/{{ $json.phone_number_id || ($json.tenant ? $json.tenant.whatsapp_phone_number_id : \"10023456789\") }}/messages",
+        "url": "=https://graph.facebook.com/v20.0/{{ $json.phone_number_id }}/messages",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Authorization",
-              "value": "=Bearer {{ $json.access_token || ($json.tenant ? $json.tenant.whatsapp_access_token : \"EAAG_DEMO_TOKEN\") }}"
+              "value": "=Bearer {{ $json.access_token }}"
             },
             {
               "name": "Content-Type",
@@ -261,12 +274,12 @@
         "options": {}
       },
       "id": "http-send-appointment-confirmation",
-      "name": "HTTP - Enviar Confirmación Cita",
+      "name": "HTTP - Send Appointment Confirmation",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
         2000,
-        300
+        180
       ]
     },
     {
@@ -277,12 +290,12 @@
           },
           "conditions": [
             {
-              "id": "cond-notify-admin-appt",
-              "leftValue": "={{ $json.notify_admin }}",
-              "rightValue": true,
+              "id": "cond-notify-admin",
+              "leftValue": "={{ $json.created_by }}",
+              "rightValue": "client",
               "operator": {
-                "type": "boolean",
-                "operation": "true"
+                "type": "string",
+                "operation": "equals"
               }
             }
           ],
@@ -290,8 +303,8 @@
         },
         "options": {}
       },
-      "id": "router-notify-admin-appt",
-      "name": "Router - Notificar Admin Cita",
+      "id": "router-notify-admin-appointment",
+      "name": "IF - Should Notify Business Admin?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -301,27 +314,27 @@
     },
     {
       "parameters": {
-        "jsCode": "const data     = $('Formatear Confirmación de Cita').item.json;\nconst apptData = $('Parsear Datos de Cita').item.json;\n\nconst buttons = [\n  { id: \"ver citas\", title: \"📅 Ver Citas Hoy\" },\n  { id: \"tareas\", title: \"📋 Ver Tareas\" }\n];\n\nreturn {\n  wa_number:  data.admin_number,\n  wa_message: `📅 *NUEVA CITA AGENDADA*\\n\\n📝 ${data.appt_title}\\n🗓️ ${data.appt_date_fmt}\\n⏰ ${data.appt_time_fmt}\\n👤 Solicitante: ${apptData.sender_number}`,\n  buttons: buttons,\n  phone_number_id: data.phone_number_id,\n  access_token: data.access_token\n};"
+        "jsCode": "const item = $input.item.json;\nconst adminMsg = `🔔 *NUEVA CITA AGENDADA POR CLIENTE*\\n\\n` +\n`👤 *Cliente:* ${item.client_name} (${item.wa_number})\\n` +\n`📌 *Asunto:* ${item.title}\\n` +\n`🗓️ *Fecha:* ${item.formatted_date}\\n` +\n`🔖 *ID Cita:* \"${item.appointment_id || 'N/A'}\"`;\n\nconst buttons = [\n  { id: \"ver citas\", title: \"📅 Ver Agenda Hoy\" },\n  { id: \"tareas\", title: \"📋 Ver Pendientes\" }\n];\n\nreturn {\n  wa_number: (item.tenant ? item.tenant.number : '521234567890'),\n  wa_message: adminMsg,\n  buttons: buttons,\n  phone_number_id: item.phone_number_id,\n  access_token: item.access_token\n};"
       },
-      "id": "prepare-admin-appointment-notify",
-      "name": "Preparar Notificación Admin Cita",
+      "id": "prepare-admin-appointment-notification",
+      "name": "Code - Prepare Admin Notification Payload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         2440,
-        140
+        120
       ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://graph.facebook.com/v20.0/{{ $json.phone_number_id || ($json.tenant ? $json.tenant.whatsapp_phone_number_id : \"10023456789\") }}/messages",
+        "url": "=https://graph.facebook.com/v20.0/{{ $json.phone_number_id }}/messages",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Authorization",
-              "value": "=Bearer {{ $json.access_token || ($json.tenant ? $json.tenant.whatsapp_access_token : \"EAAG_DEMO_TOKEN\") }}"
+              "value": "=Bearer {{ $json.access_token }}"
             },
             {
               "name": "Content-Type",
@@ -336,196 +349,34 @@
         "options": {}
       },
       "id": "http-notify-admin-appointment",
-      "name": "HTTP - Notificar Admin Nueva Cita",
+      "name": "HTTP - Send Business Admin Notification",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
         2660,
-        140
-      ]
-    },
-    {
-      "parameters": {},
-      "id": "exec-wf-trigger-f4",
-      "name": "Execute Workflow Trigger",
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1,
-      "position": [
-        240,
-        150
+        120
       ]
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.item.json;\nconst tenant = item.tenant || {};\nconst sender = item.sender || {};\nconst msg = item.message || {};\n\nconst text = msg.text || item.original_message || item.message || '';\nconst number = sender.number || tenant.number || item.number || '521234567890';\nconst senderType = sender.type || item.sender_type || 'client';\n\nreturn {\n  message: text,\n  number: number,\n  sender_type: senderType,\n  tenant: tenant,\n  sender: sender\n};"
+        "jsCode": "const apptData = $('Code - Parse Appointment Details').item.json;\nconst errorMsg = `⚠️ *No pude entender la fecha de tu cita.*\\n\\n` +\n`Por favor especifica el día y la hora. Ejemplo:\\n` +\n`_\"Quiero una cita para el próximo lunes a las 4pm para asesoría\"_`;\n\nreturn {\n  wa_number:       apptData.sender_number,\n  wa_message:      errorMsg,\n  buttons:         [{ id: \"ver citas\", title: \"📅 Ver Disponibilidad\" }, { id: \"menu\", title: \"🏠 Menú\" }],\n  phone_number_id: (apptData.tenant ? apptData.tenant.whatsapp_phone_number_id : '10023456789'),\n  access_token:    (apptData.tenant ? apptData.tenant.whatsapp_access_token : 'EAAG_DEMO_TOKEN')\n};"
       },
-      "id": "code-norm-f4",
-      "name": "Code - Normalizar Entrada Orquestador Citas",
+      "id": "format-appointment-error",
+      "name": "Code - Format Invalid Appointment Error",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        280,
-        300
+        1120,
+        420
       ]
     }
   ],
   "connections": {
-    "Manual Trigger - Solicitud de Cita": {
+    "Manual Trigger - Appointment Request": {
       "main": [
         [
           {
-            "node": "Code - Normalizar Entrada Orquestador Citas",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "NVIDIA Nemotron Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "AI Agent - Extraer Datos de Cita",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Simple Memory": {
-      "ai_memory": [
-        [
-          {
-            "node": "AI Agent - Extraer Datos de Cita",
-            "type": "ai_memory",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "AI Agent - Extraer Datos de Cita": {
-      "main": [
-        [
-          {
-            "node": "Parsear Datos de Cita",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parsear Datos de Cita": {
-      "main": [
-        [
-          {
-            "node": "Router - \u00bfCita V\u00e1lida?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Router - \u00bfCita V\u00e1lida?": {
-      "main": [
-        [
-          {
-            "node": "Supabase - Buscar Cliente para Cita",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Formatear Error de Cita",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Supabase - Buscar Cliente para Cita": {
-      "main": [
-        [
-          {
-            "node": "Preparar Insert de Cita",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Preparar Insert de Cita": {
-      "main": [
-        [
-          {
-            "node": "Supabase - Crear Cita",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Supabase - Crear Cita": {
-      "main": [
-        [
-          {
-            "node": "Formatear Confirmaci\u00f3n de Cita",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Formatear Confirmaci\u00f3n de Cita": {
-      "main": [
-        [
-          {
-            "node": "HTTP - Enviar Confirmaci\u00f3n Cita",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "HTTP - Enviar Confirmaci\u00f3n Cita": {
-      "main": [
-        [
-          {
-            "node": "Router - Notificar Admin Cita",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Router - Notificar Admin Cita": {
-      "main": [
-        [
-          {
-            "node": "Preparar Notificaci\u00f3n Admin Cita",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
-      ]
-    },
-    "Preparar Notificaci\u00f3n Admin Cita": {
-      "main": [
-        [
-          {
-            "node": "HTTP - Notificar Admin Nueva Cita",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Formatear Error de Cita": {
-      "main": [
-        [
-          {
-            "node": "HTTP - Enviar Confirmaci\u00f3n Cita",
+            "node": "Code - Normalize Inbound Appointment Request",
             "type": "main",
             "index": 0
           }
@@ -536,18 +387,169 @@
       "main": [
         [
           {
-            "node": "Code - Normalizar Entrada Orquestador Citas",
+            "node": "Code - Normalize Inbound Appointment Request",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Normalizar Entrada Orquestador Citas": {
+    "Code - Normalize Inbound Appointment Request": {
       "main": [
         [
           {
-            "node": "AI Agent - Extraer Datos de Cita",
+            "node": "AI Agent - Extract Appointment Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NVIDIA Nemotron Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Extract Appointment Details",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent - Extract Appointment Details",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Extract Appointment Details": {
+      "main": [
+        [
+          {
+            "node": "Code - Parse Appointment Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Parse Appointment Details": {
+      "main": [
+        [
+          {
+            "node": "IF - Is Valid Appointment?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Is Valid Appointment?": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Lookup Client for Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code - Format Invalid Appointment Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Lookup Client for Appointment": {
+      "main": [
+        [
+          {
+            "node": "Code - Prepare Appointment Insert Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Prepare Appointment Insert Payload": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Create Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Create Appointment": {
+      "main": [
+        [
+          {
+            "node": "Code - Format Appointment Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Format Appointment Confirmation": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Send Appointment Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP - Send Appointment Confirmation": {
+      "main": [
+        [
+          {
+            "node": "IF - Should Notify Business Admin?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Should Notify Business Admin?": {
+      "main": [
+        [
+          {
+            "node": "Code - Prepare Admin Notification Payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Code - Prepare Admin Notification Payload": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Send Business Admin Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Format Invalid Appointment Error": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Send Appointment Confirmation",
             "type": "main",
             "index": 0
           }
@@ -558,11 +560,9 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "staticData": null,
   "tags": [
     "appointments",
     "scheduling",
     "whatsapp"
-  ],
-  "pinData": {}
+  ]
 }

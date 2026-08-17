@@ -1,21 +1,21 @@
 -- =========================================================
--- SCRIPT DE SETUP PARA SUPABASE (MULTI-TENANT ESTRICTO & COMERCIO)
--- Sistema de Comercio Conversacional N8N con Orquestación Meta WhatsApp
+-- SUPABASE DATABASE SETUP SCRIPT (STRICT MULTI-TENANCY & COMMERCE)
+-- N8N Conversational Commerce & Booking System with Meta WhatsApp Cloud API
 -- =========================================================
 
 -- ─────────────────────────────────────────────
--- 1. TABLA: tenants (Negocios con credenciales Meta completas e integración WhatsApp)
+-- 1. TABLE: tenants (Stores business settings & Meta WhatsApp Cloud API credentials)
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.tenants (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    number VARCHAR(20) NOT NULL,                          -- Número de WhatsApp del Admin/Dueño
+    number VARCHAR(20) NOT NULL,                          -- Business Admin WhatsApp Phone Number
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255),
-    whatsapp_phone_number_id VARCHAR(100) UNIQUE,        -- Phone ID asignado por Meta Cloud API
-    whatsapp_access_token TEXT,                          -- Access Token (Permanent / System User Token)
+    whatsapp_phone_number_id VARCHAR(100) UNIQUE,        -- Meta Cloud API Phone Number ID
+    whatsapp_access_token TEXT,                          -- Meta Access Token (System User / Permanent)
     whatsapp_app_id VARCHAR(100),                        -- Meta App ID
-    whatsapp_app_secret TEXT,                            -- Meta App Secret (para firma HMAC X-Hub-Signature-256)
-    whatsapp_verify_token VARCHAR(255),                  -- Token de verificación para GET /webhook Meta
+    whatsapp_app_secret TEXT,                            -- Meta App Secret (for HMAC X-Hub-Signature-256)
+    whatsapp_verify_token VARCHAR(255),                  -- Verification token for GET /webhook challenge
     require_delivery_address BOOLEAN NOT NULL DEFAULT TRUE,
     enable_sales BOOLEAN NOT NULL DEFAULT TRUE,
     enable_crud BOOLEAN NOT NULL DEFAULT TRUE,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.tenants (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Asegurar columnas si la tabla ya existía previamente
+-- Ensure column existence for migrations
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS whatsapp_phone_number_id VARCHAR(100);
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS whatsapp_access_token TEXT;
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS whatsapp_app_id VARCHAR(100);
@@ -37,7 +37,7 @@ ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS enable_reports BOOLEAN NOT N
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS enable_appointments BOOLEAN NOT NULL DEFAULT TRUE;
 
 -- ─────────────────────────────────────────────
--- 2. TABLA: clients (Aislada por tenant_id)
+-- 2. TABLE: clients (Isolated by tenant_id)
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.clients (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -53,7 +53,7 @@ ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES pu
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS bot_paused BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- ─────────────────────────────────────────────
--- 3. TABLA: products (Aislada por tenant_id)
+-- 3. TABLE: products (Isolated by tenant_id)
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.products (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS public.products (
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE;
 
 -- ─────────────────────────────────────────────
--- 4. TABLA: sessions (Aislada por tenant_id y client_id + TRIGGER)
+-- 4. TABLE: sessions (Isolated by tenant_id and client_id + State Machine)
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.sessions (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -112,7 +112,7 @@ ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS tracking_number TEXT;
 ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS delivery_notes TEXT;
 ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS is_live_chat BOOLEAN NOT NULL DEFAULT FALSE;
 
--- Trigger para auto-actualizar updated_at en sessions (PRESERVADO)
+-- Trigger to auto-update updated_at timestamp in sessions
 CREATE OR REPLACE FUNCTION update_sessions_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -128,7 +128,7 @@ CREATE TRIGGER sessions_updated_at
     EXECUTE FUNCTION update_sessions_updated_at();
 
 -- ─────────────────────────────────────────────
--- 5. TABLA: appointments (Aislada por tenant_id y client_id)
+-- 5. TABLE: appointments (Isolated by tenant_id and client_id)
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.appointments (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS public.appointments (
 ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE;
 
 -- ─────────────────────────────────────────────
--- 6. RPC: search_products (Busca catálogo con filtro opcional por tenant_id)
+-- 6. RPC: search_products (Catalog search with optional tenant_id filter)
 -- ─────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.search_products(p_search_term TEXT, p_tenant_id UUID DEFAULT NULL)
 RETURNS TABLE (
@@ -187,7 +187,7 @@ END;
 $$;
 
 -- ─────────────────────────────────────────────
--- 7. RPC: adjust_product_stock (Incremento/Decremento Relativo de Stock por Chat)
+-- 7. RPC: adjust_product_stock (Relative stock increment/decrement from chat)
 -- ─────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.adjust_product_stock(
     p_tenant_id UUID,
@@ -216,7 +216,7 @@ BEGIN
     LIMIT 1;
 
     IF v_prod_id IS NULL THEN
-        RAISE EXCEPTION 'Producto no encontrado con el término %', p_product_name;
+        RAISE EXCEPTION 'Product not found matching term %', p_product_name;
     END IF;
 
     v_new_stock := GREATEST(0, v_old_stock + p_quantity_change);
@@ -231,7 +231,7 @@ END;
 $$;
 
 -- ─────────────────────────────────────────────
--- 8. RPC: check_appointment_availability (Previene Overbooking en Citas)
+-- 8. RPC: check_appointment_availability (Prevents booking overbooking / slot collision)
 -- ─────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.check_appointment_availability(
     p_tenant_id UUID,
@@ -254,7 +254,7 @@ END;
 $$;
 
 -- ─────────────────────────────────────────────
--- 9. RPC: confirm_payment_and_deduct_stock (Aprobación Atómica de Pago + Descuento Stock de Carrito)
+-- 9. RPC: confirm_payment_and_deduct_stock (Atomic payment approval + cart stock deduction)
 -- ─────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.confirm_payment_and_deduct_stock(
     p_session_id UUID,
@@ -284,16 +284,16 @@ BEGIN
     WHERE s.id = p_session_id AND s.tenant_id = p_tenant_id;
 
     IF v_client_id IS NULL THEN
-        RAISE EXCEPTION 'Sesión no encontrada o no pertenece al tenant';
+        RAISE EXCEPTION 'Session not found or does not belong to specified tenant';
     END IF;
 
-    -- 1. Actualizar estado de la sesión
+    -- 1. Update session status
     UPDATE public.sessions
     SET status = 'payment_confirmed',
         updated_at = NOW()
     WHERE id = p_session_id;
 
-    -- 2. Descuento atómico de stock iterando sobre el carrito
+    -- 2. Atomic stock deduction iterating over cart items
     IF v_cart IS NOT NULL AND jsonb_array_length(v_cart) > 0 THEN
         FOR v_item IN SELECT * FROM jsonb_array_elements(v_cart)
         LOOP
@@ -310,7 +310,7 @@ BEGIN
             END IF;
         END LOOP;
     ELSIF v_prod_id IS NOT NULL THEN
-        -- Modo retrocompatible para producto individual
+        -- Legacy single product fallback
         UPDATE public.products
         SET stock = GREATEST(0, stock - 1),
             is_active = (stock - 1 > 0)
@@ -323,34 +323,34 @@ END;
 $$;
 
 -- ─────────────────────────────────────────────
--- 10. DATOS DE EJEMPLO DE TENANT Y PRODUCTOS
+-- 10. SEED DEMO TENANT & CATALOG
 -- ─────────────────────────────────────────────
 INSERT INTO public.tenants (
     number, name, email, whatsapp_phone_number_id, whatsapp_access_token, whatsapp_verify_token,
     require_delivery_address, enable_sales, enable_crud, enable_reports, enable_appointments
 ) VALUES (
-    '521234567890', 'Mi Negocio Demo', 'admin@minegocio.com', '10023456789', 'EAAG_DEMO_TOKEN_PLACEHOLDER', 'MY_VERIFY_TOKEN_DEMO',
+    '521234567890', 'Urban Fashion Demo', 'admin@urbanfashion.com', '10023456789', 'EAAG_DEMO_TOKEN_PLACEHOLDER', 'MY_VERIFY_TOKEN_DEMO',
     true, true, true, true, true
 ) ON CONFLICT (number) DO NOTHING;
 
--- Asignar tenant_id si había productos existentes
+-- Seed products for demo tenant
 INSERT INTO public.products (tenant_id, name, description, price, stock)
 SELECT
     t.id, p.name, p.description, p.price, p.stock
 FROM public.tenants t
 CROSS JOIN (
     VALUES
-        ('Camisa Azul Manga Larga', 'Camisa formal de algodón 100%, talla estándar', 350.00, 25),
-        ('Pantalón Negro Formal', 'Pantalón de vestir corte slim, muy elegante', 480.00, 15),
-        ('Vestido Rojo Casual', 'Vestido casual para uso diario, tela liviana', 290.00, 10),
-        ('Zapatos Negros Oxford', 'Zapatos de cuero genuino, suela resistente', 750.00, 8),
-        ('Bolsa de Mano Café', 'Bolsa mediana de cuero, ideal para trabajo', 620.00, 5)
+        ('Blue Long Sleeve Shirt', '100% cotton formal shirt, standard fit', 350.00, 25),
+        ('Formal Black Trousers', 'Slim fit formal trousers, very elegant', 480.00, 15),
+        ('Casual Red Dress', 'Casual daily dress, lightweight fabric', 290.00, 10),
+        ('Oxford Black Leather Shoes', 'Genuine leather formal dress shoes', 750.00, 8),
+        ('Brown Leather Handbag', 'Medium leather handbag, ideal for work', 620.00, 5)
 ) AS p(name, description, price, stock)
 WHERE t.number = '521234567890'
 ON CONFLICT DO NOTHING;
 
 -- ─────────────────────────────────────────────
--- 11. RLS (Row Level Security) - Acceso Completo Exclusivo para Service Role
+-- 11. RLS (Row Level Security) - Strict Service Role Full Access
 -- ─────────────────────────────────────────────
 ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;

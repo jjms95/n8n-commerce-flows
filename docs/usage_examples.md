@@ -6,7 +6,7 @@ This document gathers comprehensive conversational interaction examples for both
 
 ## 👥 System Roles
 
-The Master Orchestrator (`flujo0_orquestador_whatsapp.json`) automatically classifies incoming users by comparing the sender number with the `number` column in the `public.tenants` table:
+The Master Orchestrator (`flow0_whatsapp_orchestrator.json`) automatically classifies incoming users by comparing the sender number with the `number` column in the `public.tenants` table:
 
 1. **`ROLE: BUSINESS` (Owner / Admin)**: Access to administrative commands, tasks dashboard, catalog CRUD, payment approvals/rejections, financial reports, and appointment management.
 2. **`ROLE: CLIENT` (Customer)**: Access to conversational e-commerce purchasing, dynamic product catalogs, checkout, and appointment booking.

@@ -48,7 +48,7 @@ This document details the software architecture, conversational finite-state mac
 
 ## 🔀 N8N Workflow Breakdown
 
-### 1. `flujo0_orquestador_whatsapp.json` — Master Orchestrator
+### 1. `flow0_whatsapp_orchestrator.json` — Master Orchestrator
 - **Inbound Webhook**: Dual endpoint structure on path `/webhook/whatsapp`:
   - `GET`: Responds immediately to Meta's `hub.challenge` verification handshake.
   - `POST`: Acknowledges incoming WhatsApp messages with `200 OK` and initiates the execution pipeline.
@@ -61,7 +61,7 @@ This document details the software architecture, conversational finite-state mac
 
 ---
 
-### 2. `flujo1_ventas_estados.json` — 7-State Conversational Sales Machine
+### 2. `flow1_sales_state_machine.json` — 7-State Conversational Sales Machine
 Implements a transactional state machine on the `public.sessions` table:
 
 ```mermaid
@@ -83,7 +83,7 @@ stateDiagram-v2
 
 ---
 
-### 3. `flujo2_crud_productos.json` — Catalog Management & Relative Stock
+### 3. `flow2_product_catalog_crud.json` — Catalog Management & Relative Stock
 - **Actions**:
   - `ver inventario`: Returns all active items with price and stock.
   - `crear producto <name> precio <price> stock <qty>`: Inserts a new catalog product for the tenant.
@@ -92,7 +92,7 @@ stateDiagram-v2
 
 ---
 
-### 4. `flujo3_reportes_automatizados.json` — Financial Reports & Metrics
+### 4. `flow3_automated_reports.json` — Financial Reports & Metrics
 - **Triggers**:
   - **Daily Scheduled Cron**: Runs automatically at 6:00 PM server local time.
   - **On-Demand**: When the business owner types `reporte` or `generar reporte`.
@@ -104,7 +104,7 @@ stateDiagram-v2
 
 ---
 
-### 5. `flujo4_agendamiento_citas.json` — Booking & Anti-Collision System
+### 5. `flow4_appointment_booking.json` — Booking & Anti-Collision System
 - **Conflict Prevention**: Executes `check_appointment_availability(p_tenant_id, p_appointment_date)`.
 - **Business Rule**: Enforces a minimum **±29-minute buffer** between appointments for the same tenant.
 - **Calendar Sync**: Builds dynamic Google Calendar 1-click add links for the client upon confirmation.

@@ -279,11 +279,11 @@ In n8n (`Settings > Credentials`), add the following two global credentials:
 
 Import all 5 JSON workflow files into N8N in order:
 
-1. `flujo0_orquestador_whatsapp.json` (**Activate — Webhook trigger enabled**)
-2. `flujo1_ventas_estados.json` (**Activate**)
-3. `flujo2_crud_productos.json` (**Activate**)
-4. `flujo3_reportes_automatizados.json` (**Activate — Daily 6:00 PM Cron enabled**)
-5. `flujo4_agendamiento_citas.json` (**Activate**)
+1. `flow0_whatsapp_orchestrator.json` (**Activate — Webhook trigger enabled**)
+2. `flow1_sales_state_machine.json` (**Activate**)
+3. `flow2_product_catalog_crud.json` (**Activate**)
+4. `flow3_automated_reports.json` (**Activate — Daily 6:00 PM Cron enabled**)
+5. `flow4_appointment_booking.json` (**Activate**)
 
 ---
 

@@ -1,12 +1,12 @@
 {
-  "name": "Flujo 1 - Ventas",
+  "name": "Flow 1 - Conversational Sales & 7-State Machine",
   "nodes": [
     {
       "parameters": {
-        "jsCode": "const rawInput = $input.all();\nconst ctx = $('Code - Evaluar Resultados RPC').item.json;\nlet products = [];\n\nfor (const item of rawInput) {\n  if (Array.isArray(item.json)) {\n    products.push(...item.json);\n  } else if (item.json && item.json.id && item.json.name) {\n    products.push(item.json);\n  }\n}\nproducts = products.filter(p => p && p.id && p.name);\n\nconst dname = (!ctx.is_generic_name) ? ` *${ctx.client_name}*` : '';\nlet respText = '';\nlet foundId = null;\nlet newStatus = 'pending';\nlet buttons = [];\n\nif (products.length === 1) {\n  const p = products[0];\n  foundId = p.id;\n  newStatus = 'waiting_product_approval';\n  respText = `😔 No encontré coincidencia exacta con *\"${ctx.search_term}\"*\\n\\n💡 Pero encontré este producto para ti${dname}:\\n\\n📦 *${p.name}*\\n📝 ${p.description || ''}\\n💰 Precio: $${parseFloat(p.price || 0).toFixed(2)}\\n📊 Stock: ${p.stock} unidades\\n\\n¿Deseas agregarlo a tu carrito?`;\n  buttons = [\n    { id: \"si\", title: \"🛒 Agregar al Carrito\" },\n    { id: \"ver inventario\", title: \"🔄 Ver Otros\" },\n    { id: \"cancelar\", title: \"❌ Cancelar\" }\n  ];\n} else if (products.length > 1) {\n  const hasKeyword = !!ctx.primary_keyword;\n  const header = hasKeyword\n    ? `😔 No encontré coincidencia exacta con *\"${ctx.search_term}\"*\\n\\n💡 Encontré estas opciones relacionadas. Toca una para ver detalles:`\n    : `🛍️ *PRODUCTOS DISPONIBLES*\\n\\nToca una opción para ver sus detalles:`;\n\n  let listTxt = products.map((p, i) => `${i + 1}️⃣ *${p.name}* — $${parseFloat(p.price || 0).toFixed(2)}`).join('\\n');\n  respText = `${header}\\n\\n${listTxt}`;\n  buttons = products.slice(0, 3).map(p => ({\n    id: p.name,\n    title: p.name.slice(0, 20)\n  }));\n} else {\n  respText = `😔 Lo siento${dname}, no encontré productos con *\"${ctx.search_term}\"* en este momento.\\n\\n¿Quieres intentar buscando otra cosa?`;\n  buttons = [\n    { id: \"ver inventario\", title: \"📦 Ver Catálogo\" },\n    { id: \"menu\", title: \"🏠 Menú Principal\" }\n  ];\n}\n\nreturn {\n  client_id: ctx.client_id,\n  client_number: ctx.client_number,\n  session_id: ctx.session_id,\n  search_term: ctx.search_term,\n  found_product_id: foundId,\n  response_text: respText,\n  buttons: buttons,\n  new_status: newStatus\n};"
+        "jsCode": "const rawInput = $input.all();\nconst ctx = $('Code - Evaluate RPC Results').item.json;\nlet products = [];\n\nfor (const item of rawInput) {\n  if (Array.isArray(item.json)) {\n    products.push(...item.json);\n  } else if (item.json && item.json.id && item.json.name) {\n    products.push(item.json);\n  }\n}\nproducts = products.filter(p => p && p.id && p.name);\n\nconst dname = (!ctx.is_generic_name) ? ` *${ctx.client_name}*` : '';\nlet respText = '';\nlet foundId = null;\nlet newStatus = 'pending';\nlet buttons = [];\n\nif (products.length === 1) {\n  const p = products[0];\n  foundId = p.id;\n  newStatus = 'waiting_product_approval';\n  respText = `😔 No encontré coincidencia exacta con *\"${ctx.search_term}\"*\\n\\n💡 Pero encontré este producto para ti${dname}:\\n\\n📦 *${p.name}*\\n📝 ${p.description || ''}\\n💰 Precio: $${parseFloat(p.price || 0).toFixed(2)}\\n📊 Stock: ${p.stock} unidades\\n\\n¿Deseas agregarlo a tu carrito?`;\n  buttons = [\n    { id: \"si\", title: \"🛒 Agregar al Carrito\" },\n    { id: \"ver inventario\", title: \"🔄 Ver Otros\" },\n    { id: \"cancelar\", title: \"❌ Cancelar\" }\n  ];\n} else if (products.length > 1) {\n  const hasKeyword = !!ctx.primary_keyword;\n  const header = hasKeyword\n    ? `😔 No encontré coincidencia exacta con *\"${ctx.search_term}\"*\\n\\n💡 Encontré estas opciones relacionadas. Toca una para ver detalles:`\n    : `🛍️ *PRODUCTOS DISPONIBLES*\\n\\nToca una opción para ver sus detalles:`;\n\n  let listTxt = products.map((p, i) => `${i + 1}️⃣ *${p.name}* — $${parseFloat(p.price || 0).toFixed(2)}`).join('\\n');\n  respText = `${header}\\n\\n${listTxt}`;\n  buttons = products.slice(0, 3).map(p => ({\n    id: p.name,\n    title: p.name.slice(0, 20)\n  }));\n} else {\n  respText = `😔 Lo siento${dname}, no encontré productos con *\"${ctx.search_term}\"* en este momento.\\n\\n¿Quieres intentar buscando otra cosa?`;\n  buttons = [\n    { id: \"ver inventario\", title: \"📦 Ver Catálogo\" },\n    { id: \"menu\", title: \"🏠 Menú Principal\" }\n  ];\n}\n\nreturn {\n  client_id: ctx.client_id,\n  client_number: ctx.client_number,\n  session_id: ctx.session_id,\n  search_term: ctx.search_term,\n  found_product_id: foundId,\n  response_text: respText,\n  buttons: buttons,\n  new_status: newStatus\n};"
       },
       "id": "834e8dfe-7af7-4784-a0a8-1b29d15663cd",
-      "name": "Code - Formatear Sugerencias o Catálogo",
+      "name": "Code - Format Suggestions or Catalog",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -22,7 +22,7 @@
         "options": {}
       },
       "id": "38129529-156c-4e58-879e-48efa3d33c0c",
-      "name": "HTTP - Buscar Palabra Clave o Catálogo",
+      "name": "HTTP - Search Keyword or Catalog",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -41,7 +41,7 @@
         "jsCode": "const item = $input.item.json;\nconst dname = (!item.is_generic_name) ? ` *${item.client_name}*,` : '';\n\nconst respText = `🛍️ Encontré esto para ti${dname}\\n\\n📦 *${item.product_name}*\\n📝 ${item.product_description || ''}\\n💰 Precio: $${item.product_price} COP\\n📊 Stock disponible: ${item.product_stock} unidades\\n\\n¿Cuántas unidades deseas agregar a tu carrito?`;\n\nconst buttons = [\n  { id: \"1\", title: \"1️⃣ Llevar 1 unidad\" },\n  { id: \"2\", title: \"2️⃣ Llevar 2 unidades\" },\n  { id: \"3\", title: \"3️⃣ Llevar 3 unidades\" }\n];\n\nreturn {\n  client_id: item.client_id,\n  client_number: item.client_number,\n  session_id: item.session_id,\n  search_term: item.search_term,\n  found_product_id: item.product_id,\n  response_text: respText,\n  buttons: buttons,\n  new_status: 'waiting_product_approval'\n};"
       },
       "id": "3e427f2c-0748-4aec-8511-27203467f809",
-      "name": "Code - Formatear Producto Encontrado",
+      "name": "Code - Format Found Product",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -74,7 +74,7 @@
         "options": {}
       },
       "id": "ae44b77f-f746-4b50-8903-eb65d1761da6",
-      "name": "IF - ¿Encontró Producto Exacto?",
+      "name": "IF - Found Exact Product?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -84,10 +84,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const rawInput = $input.all();\nconst ctx = $('Parsear Respuesta IA').item.json;\nlet products = [];\n\nfor (const item of rawInput) {\n  if (Array.isArray(item.json)) {\n    products.push(...item.json);\n  } else if (item.json && item.json.id && item.json.name) {\n    products.push(item.json);\n  }\n}\n\n// Filtro estricto para eliminar objetos vacíos {} o nulos\nproducts = products.filter(p => p && p.id && p.name);\n\nif (products.length > 0) {\n  const p = products[0];\n  return {\n    has_exact_match: true,\n    product_id: p.id,\n    product_name: p.name,\n    product_description: p.description || '',\n    product_price: parseFloat(p.price || 0).toFixed(2),\n    product_stock: p.stock || 0,\n    search_term: ctx.search_term,\n    client_name: ctx.client_name,\n    is_generic_name: ctx.is_generic_name,\n    client_id: ctx.client_id,\n    client_number: ctx.client_number,\n    session_id: ctx.session_id\n  };\n}\n\n// Extraer palabras clave si no hubo coincidencia exacta\nconst rawSearch = (ctx.search_term || '').toLowerCase();\nconst stopWords = new Set(['de','la','un','una','el','los','las','para','con','en','del','por','busco','quiero','necesito','me','gustaria']);\nconst words = rawSearch.split(/\\s+/).filter(w => w.length > 2 && !stopWords.has(w));\nconst primaryKeyword = words[0] || '';\n\nreturn {\n  has_exact_match: false,\n  primary_keyword: primaryKeyword,\n  all_keywords: words,\n  search_term: ctx.search_term,\n  client_name: ctx.client_name,\n  is_generic_name: ctx.is_generic_name,\n  client_id: ctx.client_id,\n  client_number: ctx.client_number,\n  session_id: ctx.session_id\n};"
+        "jsCode": "const rawInput = $input.all();\nconst ctx = $('Code - Parse AI Response').item.json;\nlet products = [];\n\nfor (const item of rawInput) {\n  if (Array.isArray(item.json)) {\n    products.push(...item.json);\n  } else if (item.json && item.json.id && item.json.name) {\n    products.push(item.json);\n  }\n}\n\n// Filtro estricto para eliminar objetos vacíos {} o nulos\nproducts = products.filter(p => p && p.id && p.name);\n\nif (products.length > 0) {\n  const p = products[0];\n  return {\n    has_exact_match: true,\n    product_id: p.id,\n    product_name: p.name,\n    product_description: p.description || '',\n    product_price: parseFloat(p.price || 0).toFixed(2),\n    product_stock: p.stock || 0,\n    search_term: ctx.search_term,\n    client_name: ctx.client_name,\n    is_generic_name: ctx.is_generic_name,\n    client_id: ctx.client_id,\n    client_number: ctx.client_number,\n    session_id: ctx.session_id\n  };\n}\n\n// Extraer palabras clave si no hubo coincidencia exacta\nconst rawSearch = (ctx.search_term || '').toLowerCase();\nconst stopWords = new Set(['de','la','un','una','el','los','las','para','con','en','del','por','busco','quiero','necesito','me','gustaria']);\nconst words = rawSearch.split(/\\s+/).filter(w => w.length > 2 && !stopWords.has(w));\nconst primaryKeyword = words[0] || '';\n\nreturn {\n  has_exact_match: false,\n  primary_keyword: primaryKeyword,\n  all_keywords: words,\n  search_term: ctx.search_term,\n  client_name: ctx.client_name,\n  is_generic_name: ctx.is_generic_name,\n  client_id: ctx.client_id,\n  client_number: ctx.client_number,\n  session_id: ctx.session_id\n};"
       },
       "id": "7773bec0-ea4c-4291-827e-436726625592",
-      "name": "Code - Evaluar Resultados RPC",
+      "name": "Code - Evaluate RPC Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -119,7 +119,7 @@
         "options": {}
       },
       "id": "4a96ad54-1e24-4492-bdea-9543fffb1b17",
-      "name": "HTTP - Notificar Negocio Nueva Evidencia",
+      "name": "HTTP - Notify Business New Payment Evidence",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -129,10 +129,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const prodItem = $input.item.json;\nconst product = Array.isArray(prodItem) ? prodItem[0] : (prodItem || {});\nconst ctx = $('Parsear Respuesta IA').item.json;\n\nlet itemsList = '';\nlet totalAmount = '0.00';\n\nif (ctx.cart_items && Array.isArray(ctx.cart_items) && ctx.cart_items.length > 0) {\n  itemsList = ctx.cart_items.map(item => ` • ${item.quantity || 1}x *${item.name}* ($${parseFloat(item.price || 0).toFixed(2)} c/u) = $${(parseFloat(item.price || 0) * (item.quantity || 1)).toFixed(2)}`).join('\\n');\n  const sum = ctx.cart_items.reduce((acc, item) => acc + (parseFloat(item.price || 0) * (item.quantity || 1)), 0);\n  totalAmount = sum.toFixed(2);\n} else {\n  const prodName = product.name || 'Producto';\n  const prodPrice = product.price ? parseFloat(product.price).toFixed(2) : '0.00';\n  itemsList = ` • 1x *${prodName}* — $${prodPrice}`;\n  totalAmount = prodPrice;\n}\n\nconst address = ctx.delivery_address || 'No requerida / no especificada';\nconst mediaUrl = ctx.media_url || 'No adjunta';\n\nconst bizMsg = `📲 *NUEVA EVIDENCIA DE PAGO RECIBIDA*\\n\\n` +\n`👤 *Cliente:* ${ctx.client_name} (${ctx.client_number})\\n` +\n`📦 *PRODUCTOS COMPRADOS:*\\n${itemsList}\\n` +\n`────────────────────────────\\n` +\n`💰 *TOTAL A VALIDAR:* $${totalAmount} COP\\n` +\n`💳 *Método de Pago:* ${ctx.payment_method || 'No especificado'}\\n` +\n`🏠 *Dirección:* ${address}\\n` +\n`📸 *Evidencia:* ${mediaUrl}\\n\\n` +\n`🆔 *ID de Sesión:* ```${ctx.session_id}```\\n\\n` +\n`👇 *Toca un botón para autorizar, rechazar o chatear:*`;\n\nconst buttons = [\n  { id: `aprobar ${ctx.session_id}`, title: \"✅ Aprobar Pago\" },\n  { id: `rechazar ${ctx.session_id}`, title: \"❌ Rechazar Pago\" },\n  { id: `pausar bot ${ctx.client_number}`, title: \"💬 Chatear Cliente\" }\n];\n\nreturn {\n  admin_number: (ctx.tenant ? ctx.tenant.number : (ctx.admin_number || '521234567890')),\n  biz_notification: bizMsg,\n  buttons: buttons,\n  client_number: ctx.client_number,\n  client_id: ctx.client_id,\n  session_id: ctx.session_id\n};"
+        "jsCode": "const prodItem = $input.item.json;\nconst product = Array.isArray(prodItem) ? prodItem[0] : (prodItem || {});\nconst ctx = $('Code - Parse AI Response').item.json;\n\nlet itemsList = '';\nlet totalAmount = '0.00';\n\nif (ctx.cart_items && Array.isArray(ctx.cart_items) && ctx.cart_items.length > 0) {\n  itemsList = ctx.cart_items.map(item => ` • ${item.quantity || 1}x *${item.name}* ($${parseFloat(item.price || 0).toFixed(2)} c/u) = $${(parseFloat(item.price || 0) * (item.quantity || 1)).toFixed(2)}`).join('\\n');\n  const sum = ctx.cart_items.reduce((acc, item) => acc + (parseFloat(item.price || 0) * (item.quantity || 1)), 0);\n  totalAmount = sum.toFixed(2);\n} else {\n  const prodName = product.name || 'Producto';\n  const prodPrice = product.price ? parseFloat(product.price).toFixed(2) : '0.00';\n  itemsList = ` • 1x *${prodName}* — $${prodPrice}`;\n  totalAmount = prodPrice;\n}\n\nconst address = ctx.delivery_address || 'No requerida / no especificada';\nconst mediaUrl = ctx.media_url || 'No adjunta';\n\nconst bizMsg = `📲 *NUEVA EVIDENCIA DE PAGO RECIBIDA*\\n\\n` +\n`👤 *Cliente:* ${ctx.client_name} (${ctx.client_number})\\n` +\n`📦 *PRODUCTOS COMPRADOS:*\\n${itemsList}\\n` +\n`────────────────────────────\\n` +\n`💰 *TOTAL A VALIDAR:* $${totalAmount} COP\\n` +\n`💳 *Método de Pago:* ${ctx.payment_method || 'No especificado'}\\n` +\n`🏠 *Dirección:* ${address}\\n` +\n`📸 *Evidencia:* ${mediaUrl}\\n\\n` +\n`🆔 *ID de Sesión:* ```${ctx.session_id}```\\n\\n` +\n`👇 *Toca un botón para autorizar, rechazar o chatear:*`;\n\nconst buttons = [\n  { id: `aprobar ${ctx.session_id}`, title: \"✅ Aprobar Pago\" },\n  { id: `rechazar ${ctx.session_id}`, title: \"❌ Rechazar Pago\" },\n  { id: `pausar bot ${ctx.client_number}`, title: \"💬 Chatear Cliente\" }\n];\n\nreturn {\n  admin_number: (ctx.tenant ? ctx.tenant.number : (ctx.admin_number || '521234567890')),\n  biz_notification: bizMsg,\n  buttons: buttons,\n  client_number: ctx.client_number,\n  client_id: ctx.client_id,\n  session_id: ctx.session_id\n};"
       },
       "id": "675545ba-d028-4e05-a502-a1e48ffea1fb",
-      "name": "Code - Formatear Notificación Negocio",
+      "name": "Code - Format Business Notification",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -148,7 +148,7 @@
         "options": {}
       },
       "id": "5393eeb2-cf56-4276-ae6e-881a5f05db59",
-      "name": "HTTP - Obtener Producto para Negocio",
+      "name": "HTTP - Fetch Product for Business",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -167,7 +167,7 @@
         "jsCode": "const ctx = $input.item.json;\nreturn { wa_message: '⚠️ En este momento no estamos solicitando dirección de entrega.', client_number: ctx.client_number, client_id: ctx.client_id, session_id: ctx.session_id };"
       },
       "id": "d37d9818-b71a-476a-8a5f-a42c53445ac1",
-      "name": "Code - Estado Incorrecto Dirección",
+      "name": "Code - Invalid State for Address",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -206,7 +206,7 @@
         }
       },
       "id": "896f6252-759b-47fb-9126-5d241ceea16d",
-      "name": "Supabase - Registrar Dirección",
+      "name": "Supabase - Register Delivery Address",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -245,7 +245,7 @@
         "options": {}
       },
       "id": "05e17989-ab73-4c48-9228-c303b257f565",
-      "name": "IF - ¿Estado Correcto para Dirección?",
+      "name": "IF - Correct State for Address?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -258,7 +258,7 @@
         "jsCode": "const ctx = $input.item.json;\nconst requireAddress = (($json.tenant ? $json.tenant.require_delivery_address !== false : true) === 'true');\nconst nextStatus = requireAddress ? 'waiting_delivery_address' : 'waiting_payment_evidence';\nconst responseMsg = requireAddress\n  ? `💳 Método de pago seleccionado: *${ctx.payment_method}*\\n\\n📍 Por favor ingresa tu *dirección de entrega completa* (calle, número, colonia, ciudad) para enviar tu pedido.`\n  : `💳 Método de pago seleccionado: *${ctx.payment_method}*\\n\\nAhora envía la *foto o captura* de tu comprobante de pago. 📸`;\n\nreturn {\n  ...ctx,\n  next_status: nextStatus,\n  response_text: responseMsg\n};"
       },
       "id": "fd0155c9-5197-4da2-b6e0-8ac08ae8e041",
-      "name": "Code - Evaluar Requerimiento Dirección",
+      "name": "Code - Evaluate Address Requirement",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -271,7 +271,7 @@
         "jsCode": "const ctx = $input.item.json;\nreturn {\n  wa_message:    '¡Excelente! Para procesar y confirmar tu compra, por favor dime tu *nombre completo*. 😊',\n  client_number: ctx.client_number,\n  client_id:     ctx.client_id,\n  session_id:    ctx.session_id\n};"
       },
       "id": "089a2446-e0be-4d2f-b349-ec5b9f97e697",
-      "name": "Code - Pedir Nombre para Compra",
+      "name": "Code - Request Name for Checkout",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -304,7 +304,7 @@
         "options": {}
       },
       "id": "45a80c65-ff9f-4f75-9139-f353440b177a",
-      "name": "IF - ¿Nombre Genérico al Aprobar?",
+      "name": "IF - Generic Name on Approval?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -332,11 +332,11 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $('Manual Trigger - Mensaje WhatsApp').item.json.number }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"{{ $json.biz_message }}\" }\n}",
+        "body": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $('Manual Trigger - WhatsApp Message').item.json.number }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"{{ $json.biz_message }}\" }\n}",
         "options": {}
       },
       "id": "e59ff498-d802-4a2d-9a1f-1a9f0c23b3e9",
-      "name": "HTTP - Notificar Negocio Error Identificador",
+      "name": "HTTP - Notify Business Invalid Identifier",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -364,11 +364,11 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ \"messaging_product\": \"whatsapp\", \"recipient_type\": \"individual\", \"to\": $('Parsear Sesión Encontrada').item.json.client_number, \"type\": \"interactive\", \"interactive\": { \"type\": \"button\", \"body\": { \"text\": \"❌ Tu comprobante de pago no pudo ser validado por nuestro equipo. Por favor vuelve a enviar una imagen clara o captura de tu comprobante. 📸\" }, \"action\": { \"buttons\": [ { \"type\": \"reply\", \"reply\": { \"id\": \"menu\", \"title\": \"🏠 Menú Principal\" } } ] } } }) }}",
+        "body": "={{ JSON.stringify({ \"messaging_product\": \"whatsapp\", \"recipient_type\": \"individual\", \"to\": $('Code - Parse Found Session').item.json.client_number, \"type\": \"interactive\", \"interactive\": { \"type\": \"button\", \"body\": { \"text\": \"❌ Tu comprobante de pago no pudo ser validado por nuestro equipo. Por favor vuelve a enviar una imagen clara o captura de tu comprobante. 📸\" }, \"action\": { \"buttons\": [ { \"type\": \"reply\", \"reply\": { \"id\": \"menu\", \"title\": \"🏠 Menú Principal\" } } ] } } }) }}",
         "options": {}
       },
       "id": "1466c161-c025-4172-ba3d-db8bf6b2553a",
-      "name": "HTTP - Notificar Cliente Pago Rechazado",
+      "name": "HTTP - Notify Client Payment Rejected",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -403,7 +403,7 @@
         }
       },
       "id": "f8e171c8-a90d-469a-97cb-cedd179ccece",
-      "name": "Supabase - Rechazar Pago",
+      "name": "Supabase - Reject Payment",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -490,7 +490,7 @@
         }
       },
       "id": "7da38b21-8b6a-4407-95b2-dbc3595061e4",
-      "name": "Router - Acción Negocio",
+      "name": "Switch - Business Action Router",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
       "position": [
@@ -500,10 +500,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const bizCmd = $('Parsear Comando de Negocio').item.json;\nconst items  = $input.all();\nlet sessionData = null;\n\nif (items.length > 0 && Array.isArray(items[0].json)) {\n  sessionData = items[0].json[0] || null;\n} else if (items.length > 0 && items[0].json && items[0].json.id) {\n  sessionData = items[0].json;\n}\n\nif (!sessionData) {\n  return {\n    found: false,\n    action: bizCmd.action,\n    identifier: bizCmd.identifier,\n    biz_message: `⚠️ No se encontró ninguna sesión activa pendiente de confirmación con el identificador: \"${bizCmd.identifier}\".`\n  };\n}\n\nconst clientObj = Array.isArray(sessionData.clients) ? sessionData.clients[0] : (sessionData.clients || {});\n\nreturn {\n  found: true,\n  session_id: sessionData.id,\n  client_id: sessionData.client_id,\n  client_number: clientObj.number || '',\n  client_name: clientObj.name || 'Cliente',\n  action: bizCmd.action,\n  identifier: bizCmd.identifier\n};"
+        "jsCode": "const bizCmd = $('Code - Parse Business Command').item.json;\nconst items  = $input.all();\nlet sessionData = null;\n\nif (items.length > 0 && Array.isArray(items[0].json)) {\n  sessionData = items[0].json[0] || null;\n} else if (items.length > 0 && items[0].json && items[0].json.id) {\n  sessionData = items[0].json;\n}\n\nif (!sessionData) {\n  return {\n    found: false,\n    action: bizCmd.action,\n    identifier: bizCmd.identifier,\n    biz_message: `⚠️ No se encontró ninguna sesión activa pendiente de confirmación con el identificador: \"${bizCmd.identifier}\".`\n  };\n}\n\nconst clientObj = Array.isArray(sessionData.clients) ? sessionData.clients[0] : (sessionData.clients || {});\n\nreturn {\n  found: true,\n  session_id: sessionData.id,\n  client_id: sessionData.client_id,\n  client_number: clientObj.number || '',\n  client_name: clientObj.name || 'Cliente',\n  action: bizCmd.action,\n  identifier: bizCmd.identifier\n};"
       },
       "id": "0c33f7b9-93c3-4afe-9bd8-925e1baf558a",
-      "name": "Parsear Sesión Encontrada",
+      "name": "Code - Parse Found Session",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -519,7 +519,7 @@
         "options": {}
       },
       "id": "6a61fade-e1f0-4915-82d9-e6a59e3ea713",
-      "name": "HTTP - Buscar Sesión por ID o Teléfono",
+      "name": "HTTP - Lookup Session by ID or Phone",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -581,7 +581,7 @@
         6032
       ],
       "id": "872e2f61-08b4-4000-8357-c197cac0c277",
-      "name": "AI Agent"
+      "name": "AI Agent - Sales Intent Classifier"
     },
     {
       "parameters": {
@@ -603,11 +603,11 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ $('Preparar Respuesta WhatsApp').item.json.buttons && $('Preparar Respuesta WhatsApp').item.json.buttons.length > 0 ? JSON.stringify({ \"messaging_product\": \"whatsapp\", \"recipient_type\": \"individual\", \"to\": $('Preparar Respuesta WhatsApp').item.json.wa_number, \"type\": \"interactive\", \"interactive\": { \"type\": \"button\", \"body\": { \"text\": $('Preparar Respuesta WhatsApp').item.json.wa_message }, \"action\": { \"buttons\": $('Preparar Respuesta WhatsApp').item.json.buttons.slice(0, 3).map(b => ({ \"type\": \"reply\", \"reply\": { \"id\": b.id, \"title\": b.title.slice(0, 20) } })) } } }) : JSON.stringify({ \"messaging_product\": \"whatsapp\", \"to\": $('Preparar Respuesta WhatsApp').item.json.wa_number, \"type\": \"text\", \"text\": { \"body\": $('Preparar Respuesta WhatsApp').item.json.wa_message } }) }}",
+        "body": "={{ $('Code - Prepare WhatsApp Response').item.json.buttons && $('Code - Prepare WhatsApp Response').item.json.buttons.length > 0 ? JSON.stringify({ \"messaging_product\": \"whatsapp\", \"recipient_type\": \"individual\", \"to\": $('Code - Prepare WhatsApp Response').item.json.wa_number, \"type\": \"interactive\", \"interactive\": { \"type\": \"button\", \"body\": { \"text\": $('Code - Prepare WhatsApp Response').item.json.wa_message }, \"action\": { \"buttons\": $('Code - Prepare WhatsApp Response').item.json.buttons.slice(0, 3).map(b => ({ \"type\": \"reply\", \"reply\": { \"id\": b.id, \"title\": b.title.slice(0, 20) } })) } } }) : JSON.stringify({ \"messaging_product\": \"whatsapp\", \"to\": $('Code - Prepare WhatsApp Response').item.json.wa_number, \"type\": \"text\", \"text\": { \"body\": $('Code - Prepare WhatsApp Response').item.json.wa_message } }) }}",
         "options": {}
       },
       "id": "a7bc067e-7d7e-4264-a2e3-29717710cfeb",
-      "name": "HTTP - Enviar Respuesta WhatsApp",
+      "name": "HTTP - Send WhatsApp Response",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -638,7 +638,7 @@
         }
       },
       "id": "ca489799-c374-4c11-b361-befdd36919eb",
-      "name": "Supabase - Guardar Respuesta en Sesión",
+      "name": "Supabase - Save Response to Session",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -654,10 +654,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const input = $input.item.json;\nconst trigger = $('Manual Trigger - Mensaje WhatsApp').item?.json || {};\n\nlet waMessage = input.wa_message;\nlet buttons = Array.isArray(input.buttons) ? input.buttons : [];\n\n// Si la entrada viene de un nodo Supabase que retornó la fila de BD, rescatar el wa_message del nodo Code emisor\nif (!waMessage) {\n  try { waMessage = $('Code - Confirmar Nombre Registrado').item.json.wa_message; } catch(e) {}\n}\nif (!waMessage) {\n  try { waMessage = $('Code - Formatear Sugerencias o Catálogo').item.json.response_text; } catch(e) {}\n}\nif (!waMessage) {\n  try { waMessage = $('Code - Respuesta Fallback').item.json.wa_message; } catch(e) {}\n}\nif (buttons.length === 0) {\n  try {\n    const b = $('Code - Formatear Sugerencias o Catálogo').item.json.buttons;\n    if (Array.isArray(b)) buttons = b;\n  } catch(e) {}\n}\nif (buttons.length === 0) {\n  try {\n    const b = $('Code - Formatear Producto Encontrado').item.json.buttons;\n    if (Array.isArray(b)) buttons = b;\n  } catch(e) {}\n}\n\nconst finalMsg = waMessage || input.response || '¿En qué puedo ayudarte?';\nconst waNumber  = input.wa_number || input.client_number || trigger.number || '573001234567';\nconst sessionId = input.session_id || input.id || null;\nconst clientId  = input.client_id || null;\n\nreturn { wa_number: waNumber, wa_message: finalMsg, buttons: buttons, session_id: sessionId, client_id: clientId };"
+        "jsCode": "const input = $input.item.json;\nconst trigger = $('Manual Trigger - WhatsApp Message').item?.json || {};\n\nlet waMessage = input.wa_message;\nlet buttons = Array.isArray(input.buttons) ? input.buttons : [];\n\n// Si la entrada viene de un nodo Supabase que retornó la fila de BD, rescatar el wa_message del nodo Code emisor\nif (!waMessage) {\n  try { waMessage = $('Code - Confirm Registered Name').item.json.wa_message; } catch(e) {}\n}\nif (!waMessage) {\n  try { waMessage = $('Code - Format Suggestions or Catalog').item.json.response_text; } catch(e) {}\n}\nif (!waMessage) {\n  try { waMessage = $('Code - Fallback Response').item.json.wa_message; } catch(e) {}\n}\nif (buttons.length === 0) {\n  try {\n    const b = $('Code - Format Suggestions or Catalog').item.json.buttons;\n    if (Array.isArray(b)) buttons = b;\n  } catch(e) {}\n}\nif (buttons.length === 0) {\n  try {\n    const b = $('Code - Format Found Product').item.json.buttons;\n    if (Array.isArray(b)) buttons = b;\n  } catch(e) {}\n}\n\nconst finalMsg = waMessage || input.response || '¿En qué puedo ayudarte?';\nconst waNumber  = input.wa_number || input.client_number || trigger.number || '573001234567';\nconst sessionId = input.session_id || input.id || null;\nconst clientId  = input.client_id || null;\n\nreturn { wa_number: waNumber, wa_message: finalMsg, buttons: buttons, session_id: sessionId, client_id: clientId };"
       },
       "id": "88066122-36f1-44dc-b7cd-e3a98227e7de",
-      "name": "Preparar Respuesta WhatsApp",
+      "name": "Code - Prepare WhatsApp Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -670,7 +670,7 @@
         "jsCode": "const ctx = $input.item.json;\nconst name = (!ctx.is_generic_name) ? ` *${ctx.client_name}*` : '';\nconst status = ctx.session_status || 'pending';\n\nlet msg = '';\nswitch(status) {\n  case 'pending':\n    msg = `¡Hola${name}! 👋 Bienvenido/a a nuestra tienda.\\n\\nTe puedo ayudar a buscar cualquier producto de nuestro catálogo. Simplemente dime qué estás buscando (ejemplo: *\"busco una camisa azul\"* o *\"tenis negros\"*).`;\n    break;\n  case 'waiting_product_approval':\n    msg = `Actualmente tienes un producto mostrado.\\n\\nResponde *SÍ* para comprarlo, *NO* para buscar otro producto, o dime qué otra cosa estás buscando.`;\n    break;\n  case 'select_payment':\n    msg = `Por favor dinos cuál es tu método de pago preferido (transferencia, efectivo o tarjeta).`;\n    break;\n  case 'waiting_delivery_address':\n    msg = `Por favor ingresa tu dirección de entrega completa para continuar con tu pedido.`;\n    break;\n  case 'waiting_payment_evidence':\n    msg = `Por favor envía la foto o captura de tu comprobante de pago para verificar tu pedido. 📸`;\n    break;\n  case 'waiting_business_confirmation':\n    msg = `Tu comprobante ya está siendo revisado por nuestro equipo. Te notificaremos en breve. ⏳`;\n    break;\n  default:\n    msg = `¡Hola${name}! 👋 ¿En qué te puedo ayudar hoy? Cuéntame qué producto estás buscando.`;\n}\n\nreturn {\n  wa_message:    msg,\n  client_number: ctx.client_number,\n  client_id:     ctx.client_id,\n  session_id:    ctx.session_id\n};"
       },
       "id": "d616a088-2572-4405-ba6d-0e29755d16d7",
-      "name": "Code - Respuesta Fallback",
+      "name": "Code - Fallback Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -683,7 +683,7 @@
         "jsCode": "const ctx = $input.item.json;\nconst s = ctx.session_status || 'pending';\nconst msgs = {\n  pending:                  '⚠️ Primero necesitas buscar y aprobar un producto.',\n  waiting_product_approval: '⚠️ Aún no aprobaste el producto. ¿Deseas comprarlo?',\n  select_payment:           '💳 Primero indica tu método de pago antes del comprobante.'\n};\nreturn { wa_message: msgs[s] || '⚠️ No esperaba un comprobante en este momento.', client_number: ctx.client_number, client_id: ctx.client_id, session_id: ctx.session_id };"
       },
       "id": "68d0d2ab-ab32-4c0a-bc4f-28c2e30ec742",
-      "name": "Code - Estado Incorrecto Evidence",
+      "name": "Code - Invalid State for Evidence",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -718,7 +718,7 @@
         }
       },
       "id": "35fa1f93-462b-4397-91b2-79716bb04d02",
-      "name": "Supabase - Evidencia de Pago",
+      "name": "Supabase - Register Payment Evidence",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -757,7 +757,7 @@
         "options": {}
       },
       "id": "b8340bf4-04a7-4f64-883d-7925f72e2476",
-      "name": "IF - ¿Estado Correcto para Evidencia?",
+      "name": "IF - Correct State for Evidence?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -770,7 +770,7 @@
         "jsCode": "const ctx = $input.item.json;\nconst s = ctx.session_status || 'pending';\nconst msgs = {\n  pending:                  '🔍 Primero busca y aprueba un producto. ¿Qué estás buscando?',\n  waiting_product_approval: '📦 Aún no confirmaste el producto. Responde *SÍ* o *NO*.',\n  waiting_payment_evidence: '📸 Ya registramos tu pago. Solo falta el comprobante.',\n  waiting_business_confirmation: '⏳ Tu pago ya está en revisión.'\n};\nreturn { wa_message: msgs[s] || '⚠️ No es el momento de indicar un método de pago.', client_number: ctx.client_number, client_id: ctx.client_id, session_id: ctx.session_id };"
       },
       "id": "e7dbd32d-14cc-41a7-9c54-7629f7f5f0d4",
-      "name": "Code - Estado Incorrecto Payment",
+      "name": "Code - Invalid State for Payment",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -809,7 +809,7 @@
         }
       },
       "id": "055353a8-e54b-4489-b6f0-98964478612d",
-      "name": "Supabase - Registrar Método Pago",
+      "name": "Supabase - Register Payment Method",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -848,7 +848,7 @@
         "options": {}
       },
       "id": "4b71abd3-c72d-44b5-93f9-8d2095de73ff",
-      "name": "IF - ¿Estado Correcto para Pago?",
+      "name": "IF - Correct State for Payment?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -861,7 +861,7 @@
         "jsCode": "const ctx = $input.item.json;\nconst s = ctx.session_status || 'pending';\nconst msgs = {\n  pending:                      '🔍 Aún no tenemos un producto para aprobar. ¿Qué estás buscando?',\n  select_payment:               '💳 Ya aprobaste el producto. Por favor elige tu método de pago.',\n  waiting_payment_evidence:     '📸 Ya elegiste el pago. Envía tu comprobante para continuar.',\n  waiting_business_confirmation:'⏳ Tu pago ya está en revisión. Espera la confirmación del negocio.'\n};\nreturn { wa_message: msgs[s] || '⚠️ No hay producto pendiente de aprobación. ¿Qué buscas?', client_number: ctx.client_number, client_id: ctx.client_id, session_id: ctx.session_id };"
       },
       "id": "ea9106f7-a55b-4475-81f2-6c446dda901e",
-      "name": "Code - Estado Incorrecto Approve",
+      "name": "Code - Invalid State for Approval",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -896,7 +896,7 @@
         }
       },
       "id": "618cdb26-9572-4c3e-9cf7-72c83973f9a9",
-      "name": "Supabase - Aprobar Producto",
+      "name": "Supabase - Approve Product in Session",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -935,7 +935,7 @@
         "options": {}
       },
       "id": "e998dc9b-5135-4d37-bcce-fab750057b6f",
-      "name": "IF - ¿Estado Correcto para Aprobar?",
+      "name": "IF - Correct State for Approval?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -945,10 +945,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const updClient = $input.item.json;\nconst ctx       = $('Parsear Respuesta IA').item.json;\nconst name      = updClient.name || ctx.extracted_name || 'amigo/a';\nconst status    = ctx.session_status || 'pending';\n\nlet msg = '';\nlet newStatus = status;\n\nif (status === 'waiting_product_approval') {\n  // El cliente proporcionó su nombre después de aprobar un producto\n  // Avanzamos automáticamente la sesión al estado 'select_payment'\n  newStatus = 'select_payment';\n  msg = `¡Mucho gusto, *${name}*! 😊 Ya quedó registrado tu nombre.\\n\\n✅ ¡Producto aprobado!\\n\\n💳 ¿Cómo deseas pagar?\\n\\n1️⃣ Transferencia bancaria\\n2️⃣ Efectivo\\n3️⃣ Tarjeta de crédito/débito\\n\\nEscribe el nombre o número de tu método de pago.`;\n} else if (status === 'select_payment') {\n  msg = `¡Mucho gusto, *${name}*! 😊 Por favor dinos cuál es tu método de pago preferido (transferencia, efectivo o tarjeta).`;\n} else if (status === 'waiting_delivery_address') {\n  msg = `¡Mucho gusto, *${name}*! 😊 Por favor ingresa tu dirección de entrega completa para continuar con tu pedido.`;\n} else if (status === 'waiting_payment_evidence') {\n  msg = `¡Mucho gusto, *${name}*! 😊 Por favor envía la foto o captura de tu comprobante de pago. 📸`;\n} else {\n  msg = `¡Mucho gusto, *${name}*! 😊 Ya quedó registrado tu nombre.\\n\\n¿Qué producto estás buscando hoy?`;\n}\n\nreturn {\n  client_id:     ctx.client_id,\n  client_number: ctx.client_number,\n  session_id:    ctx.session_id,\n  wa_message:    msg,\n  new_status:    newStatus\n};"
+        "jsCode": "const updClient = $input.item.json;\nconst ctx       = $('Code - Parse AI Response').item.json;\nconst name      = updClient.name || ctx.extracted_name || 'amigo/a';\nconst status    = ctx.session_status || 'pending';\n\nlet msg = '';\nlet newStatus = status;\n\nif (status === 'waiting_product_approval') {\n  // El cliente proporcionó su nombre después de aprobar un producto\n  // Avanzamos automáticamente la sesión al estado 'select_payment'\n  newStatus = 'select_payment';\n  msg = `¡Mucho gusto, *${name}*! 😊 Ya quedó registrado tu nombre.\\n\\n✅ ¡Producto aprobado!\\n\\n💳 ¿Cómo deseas pagar?\\n\\n1️⃣ Transferencia bancaria\\n2️⃣ Efectivo\\n3️⃣ Tarjeta de crédito/débito\\n\\nEscribe el nombre o número de tu método de pago.`;\n} else if (status === 'select_payment') {\n  msg = `¡Mucho gusto, *${name}*! 😊 Por favor dinos cuál es tu método de pago preferido (transferencia, efectivo o tarjeta).`;\n} else if (status === 'waiting_delivery_address') {\n  msg = `¡Mucho gusto, *${name}*! 😊 Por favor ingresa tu dirección de entrega completa para continuar con tu pedido.`;\n} else if (status === 'waiting_payment_evidence') {\n  msg = `¡Mucho gusto, *${name}*! 😊 Por favor envía la foto o captura de tu comprobante de pago. 📸`;\n} else {\n  msg = `¡Mucho gusto, *${name}*! 😊 Ya quedó registrado tu nombre.\\n\\n¿Qué producto estás buscando hoy?`;\n}\n\nreturn {\n  client_id:     ctx.client_id,\n  client_number: ctx.client_number,\n  session_id:    ctx.session_id,\n  wa_message:    msg,\n  new_status:    newStatus\n};"
       },
       "id": "15db57ba-7eec-4632-8ae5-af2b415e8f76",
-      "name": "Code - Confirmar Nombre Registrado",
+      "name": "Code - Confirm Registered Name",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -979,7 +979,7 @@
         }
       },
       "id": "c3b3ac07-ab8d-4f0f-b26f-92bd89e44c7d",
-      "name": "Supabase - Actualizar Nombre Cliente",
+      "name": "Supabase - Update Client Name",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -998,7 +998,7 @@
         "jsCode": "const ctx = $input.item.json;\nreturn {\n  wa_message:    `¡Hola, *${ctx.client_name}*! 👋 Bienvenido/a a nuestra tienda.\\n\\n¿Qué producto estás buscando hoy?`,\n  client_number: ctx.client_number,\n  client_id:     ctx.client_id,\n  session_id:    ctx.session_id\n};"
       },
       "id": "e34811bb-f932-4755-84a6-b9bcd0b9058a",
-      "name": "Code - Saludar con Nombre",
+      "name": "Code - Greet with Client Name",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -1011,7 +1011,7 @@
         "jsCode": "const ctx = $input.item.json;\nreturn {\n  wa_message:    '¡Hola! 👋 Bienvenido/a a nuestra tienda.\\n\\n¿Cuál es tu nombre y qué producto estás buscando hoy?',\n  client_number: ctx.client_number,\n  client_id:     ctx.client_id,\n  session_id:    ctx.session_id\n};"
       },
       "id": "98bc6685-eaf1-4479-b4d4-a358ff67d977",
-      "name": "Code - Pedir Nombre al Cliente",
+      "name": "Code - Request Client Name",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -1044,7 +1044,7 @@
         "options": {}
       },
       "id": "d38fb33f-24ee-49e0-9896-60614a53e71a",
-      "name": "IF - ¿Nombre Genérico?",
+      "name": "IF - Is Generic Name?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -1087,7 +1087,7 @@
         }
       },
       "id": "8d4b76fb-459f-43d9-ac66-821ab8d199a8",
-      "name": "Supabase - Guardar Sesión Búsqueda",
+      "name": "Supabase - Save Search Session",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -1114,7 +1114,7 @@
         "options": {}
       },
       "id": "0886f932-42b6-4261-b274-4e0effb03ac3",
-      "name": "HTTP - Buscar Productos (RPC)",
+      "name": "HTTP - Search Products RPC",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -1131,10 +1131,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('Parsear Respuesta IA').item.json;\nreturn {\n  wa_message:    '🔍 Con gusto te ayudo a buscar.\\n\\n¿Qué producto estás buscando? Puedes describirlo con color, talla, modelo o cualquier detalle.',\n  client_number: ctx.client_number,\n  client_id:     ctx.client_id,\n  session_id:    ctx.session_id\n};"
+        "jsCode": "const ctx = $('Code - Parse AI Response').item.json;\nreturn {\n  wa_message:    '🔍 Con gusto te ayudo a buscar.\\n\\n¿Qué producto estás buscando? Puedes describirlo con color, talla, modelo o cualquier detalle.',\n  client_number: ctx.client_number,\n  client_id:     ctx.client_id,\n  session_id:    ctx.session_id\n};"
       },
       "id": "259d34d4-9661-4b70-b4ab-b2f945e7b571",
-      "name": "Code - Pedir Término de Búsqueda",
+      "name": "Code - Request Search Term",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -1167,7 +1167,7 @@
         "options": {}
       },
       "id": "ac259fe9-9a25-478a-a55c-3ba830ec23c9",
-      "name": "IF - ¿Tiene Término de Búsqueda?",
+      "name": "IF - Has Search Term?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -1214,7 +1214,7 @@
         }
       },
       "id": "00e694ed-917b-4396-bb76-705d46de3ae0",
-      "name": "Supabase - Cancelar Sesión",
+      "name": "Supabase - Cancel Session",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -1423,7 +1423,7 @@
         }
       },
       "id": "c2ae95f7-2837-4384-a9ab-95b52a802a92",
-      "name": "Switch - Intent del Cliente",
+      "name": "Switch - Client Intent Router",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
       "position": [
@@ -1433,10 +1433,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.item.json.output || $input.item.json.text || '{}';\nconst ctx = $('Preparar Contexto para IA').item.json;\nlet p = {};\ntry { const m = raw.match(/\\{[\\s\\S]*\\}/); if (m) p = JSON.parse(m[0]); }\ncatch(e) { p = { intent:'OTHER', search_term:'', payment_method:'', extracted_name:'', extracted_address:'', confidence:0 }; }\n\nlet intent = (p.intent || 'OTHER').toUpperCase();\n\n// Regla 1: si hay imagen y no es cancelación → siempre EVIDENCE\nif (ctx.has_media && intent !== 'CANCEL') intent = 'EVIDENCE';\n\n// Regla 2: si la sesión está en waiting_delivery_address y el mensaje no es CANCEL → interpretar como PROVIDE_ADDRESS\nif (ctx.session_status === 'waiting_delivery_address' && intent !== 'CANCEL') {\n  intent = 'PROVIDE_ADDRESS';\n}\n\n// Regla 3: Detección PRECISA de si el bot realmente PIDIÓ el nombre en el turno anterior\nif (!ctx.has_media && intent !== 'PROVIDE_ADDRESS') {\n  const last = (ctx.last_bot_message || '').toLowerCase();\n  \n  // Solo se considera que el bot pidió el nombre si contiene frases explícitas de PREGUNTA\n  const botPedioNombre = (\n    last.includes('cuál es tu nombre') ||\n    last.includes('cual es tu nombre') ||\n    last.includes('dime tu nombre') ||\n    last.includes('nombre completo') ||\n    last.includes('cómo te llamas') ||\n    last.includes('como te llamas') ||\n    last.includes('decir tu nombre')\n  ) && !last.includes('ya quedó registrado') && !last.includes('ya registré');\n\n  if (botPedioNombre && intent !== 'CANCEL') {\n    intent = 'PROVIDE_NAME';\n    if (!p.extracted_name || p.extracted_name.trim() === '') {\n      p.extracted_name = ctx.user_message;\n    }\n  }\n}\n\nreturn {\n  ...ctx,\n  intent,\n  final_intent:      intent,\n  search_term:       (p.search_term       || '').trim(),\n  payment_method:    (p.payment_method    || '').trim(),\n  extracted_name:    (p.extracted_name    || ctx.user_message || '').trim(),\n  extracted_address: (p.extracted_address || ctx.user_message || '').trim(),\n  ai_confidence:     p.confidence || 0\n};"
+        "jsCode": "const raw = $input.item.json.output || $input.item.json.text || '{}';\nconst ctx = $('Code - Prepare Context for AI').item.json;\nlet p = {};\ntry { const m = raw.match(/\\{[\\s\\S]*\\}/); if (m) p = JSON.parse(m[0]); }\ncatch(e) { p = { intent:'OTHER', search_term:'', payment_method:'', extracted_name:'', extracted_address:'', confidence:0 }; }\n\nlet intent = (p.intent || 'OTHER').toUpperCase();\n\n// Regla 1: si hay imagen y no es cancelación → siempre EVIDENCE\nif (ctx.has_media && intent !== 'CANCEL') intent = 'EVIDENCE';\n\n// Regla 2: si la sesión está en waiting_delivery_address y el mensaje no es CANCEL → interpretar como PROVIDE_ADDRESS\nif (ctx.session_status === 'waiting_delivery_address' && intent !== 'CANCEL') {\n  intent = 'PROVIDE_ADDRESS';\n}\n\n// Regla 3: Detección PRECISA de si el bot realmente PIDIÓ el nombre en el turno anterior\nif (!ctx.has_media && intent !== 'PROVIDE_ADDRESS') {\n  const last = (ctx.last_bot_message || '').toLowerCase();\n  \n  // Solo se considera que el bot pidió el nombre si contiene frases explícitas de PREGUNTA\n  const botPedioNombre = (\n    last.includes('cuál es tu nombre') ||\n    last.includes('cual es tu nombre') ||\n    last.includes('dime tu nombre') ||\n    last.includes('nombre completo') ||\n    last.includes('cómo te llamas') ||\n    last.includes('como te llamas') ||\n    last.includes('decir tu nombre')\n  ) && !last.includes('ya quedó registrado') && !last.includes('ya registré');\n\n  if (botPedioNombre && intent !== 'CANCEL') {\n    intent = 'PROVIDE_NAME';\n    if (!p.extracted_name || p.extracted_name.trim() === '') {\n      p.extracted_name = ctx.user_message;\n    }\n  }\n}\n\nreturn {\n  ...ctx,\n  intent,\n  final_intent:      intent,\n  search_term:       (p.search_term       || '').trim(),\n  payment_method:    (p.payment_method    || '').trim(),\n  extracted_name:    (p.extracted_name    || ctx.user_message || '').trim(),\n  extracted_address: (p.extracted_address || ctx.user_message || '').trim(),\n  ai_confidence:     p.confidence || 0\n};"
       },
       "id": "83b03864-d2ca-4380-944a-521cc216958e",
-      "name": "Parsear Respuesta IA",
+      "name": "Code - Parse AI Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -1446,10 +1446,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const input = $input.item.json;\nconst clientData = $('Merge - Datos de Cliente').item.json;\n\nconst sessionId        = input.session_id        || input.id               || null;\nconst sessionStatus    = input.session_status    || input.status           || 'pending';\nconst lastBotMessage   = input.session_response   || input.response         || '';\nconst foundProduct     = input.found_product_id  || null;\nconst paymentMethod    = input.payment_method    || '';\nconst deliveryAddress  = input.delivery_address  || '';\n\nconst isGenericName = !clientData.client_name || clientData.client_name.startsWith('Cliente ');\n\nreturn {\n  session_id:       sessionId,\n  session_status:   sessionStatus,\n  found_product_id: foundProduct,\n  payment_method:   paymentMethod,\n  delivery_address: deliveryAddress,\n  last_bot_message: lastBotMessage,\n  client_id:        input.client_id      || clientData.client_id,\n  client_number:    clientData.client_number,\n  client_name:      clientData.client_name,\n  is_generic_name:  isGenericName,\n  user_message:     clientData.original_message,\n  media_url:        clientData.media_url || '',\n  has_media:        !!(clientData.media_url && clientData.media_url.trim() !== '')\n};"
+        "jsCode": "const input = $input.item.json;\nconst clientData = $('Merge - Client Data').item.json;\n\nconst sessionId        = input.session_id        || input.id               || null;\nconst sessionStatus    = input.session_status    || input.status           || 'pending';\nconst lastBotMessage   = input.session_response   || input.response         || '';\nconst foundProduct     = input.found_product_id  || null;\nconst paymentMethod    = input.payment_method    || '';\nconst deliveryAddress  = input.delivery_address  || '';\n\nconst isGenericName = !clientData.client_name || clientData.client_name.startsWith('Cliente ');\n\nreturn {\n  session_id:       sessionId,\n  session_status:   sessionStatus,\n  found_product_id: foundProduct,\n  payment_method:   paymentMethod,\n  delivery_address: deliveryAddress,\n  last_bot_message: lastBotMessage,\n  client_id:        input.client_id      || clientData.client_id,\n  client_number:    clientData.client_number,\n  client_name:      clientData.client_name,\n  is_generic_name:  isGenericName,\n  user_message:     clientData.original_message,\n  media_url:        clientData.media_url || '',\n  has_media:        !!(clientData.media_url && clientData.media_url.trim() !== '')\n};"
       },
       "id": "1aff82d4-d897-4f9a-b087-821c1cad07b9",
-      "name": "Preparar Contexto para IA",
+      "name": "Code - Prepare Context for AI",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -1477,7 +1477,7 @@
         }
       },
       "id": "92096b6b-0548-45ed-b024-b5b06700cdbd",
-      "name": "Supabase - Crear Sesión Inicial",
+      "name": "Supabase - Create Initial Session",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -1516,7 +1516,7 @@
         "options": {}
       },
       "id": "77cf1579-f380-4588-b3fe-8aa5e411a49d",
-      "name": "IF - ¿Necesita Crear Sesión?",
+      "name": "IF - Needs Initial Session?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -1526,10 +1526,10 @@
     },
     {
       "parameters": {
-        "jsCode": "// Lee el resultado del getAll (puede ser {} vacío si no hay sesión)\nconst items = $input.all();\nconst session = (items.length > 0 && items[0].json && items[0].json.id) ? items[0].json : null;\nconst clientData = $('Merge - Datos de Cliente').item.json;\nreturn {\n  has_session:     session !== null,\n  session_id:      session?.id     || null,\n  session_status:  session?.status || 'pending',\n  session_response: session?.response || '',\n  found_product_id: session?.found_product_id || null,\n  payment_method:  session?.payment_method || '',\n  client_id:       clientData.client_id\n};"
+        "jsCode": "// Lee el resultado del getAll (puede ser {} vacío si no hay sesión)\nconst items = $input.all();\nconst session = (items.length > 0 && items[0].json && items[0].json.id) ? items[0].json : null;\nconst clientData = $('Merge - Client Data').item.json;\nreturn {\n  has_session:     session !== null,\n  session_id:      session?.id     || null,\n  session_status:  session?.status || 'pending',\n  session_response: session?.response || '',\n  found_product_id: session?.found_product_id || null,\n  payment_method:  session?.payment_method || '',\n  client_id:       clientData.client_id\n};"
       },
       "id": "f76f009e-5e61-4d2d-bb45-57e14af73114",
-      "name": "Code - Verificar Sesión",
+      "name": "Code - Verify Active Session",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -1558,7 +1558,7 @@
         }
       },
       "id": "5a71878b-cd2f-4550-887d-ee6487771d7b",
-      "name": "Supabase - Obtener Sesión Activa",
+      "name": "Supabase - Get Active Session",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -1575,10 +1575,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const s = $input.item.json;\nreturn {\n  client_id:     s.id || s.client_id,\n  client_number: s.number || s.client_number,\n  client_name:   s.name   || s.client_name,\n  original_message: $('Manual Trigger - Mensaje WhatsApp').item.json.message || '',\n  media_url:        $('Manual Trigger - Mensaje WhatsApp').item.json.media_url || ''\n};"
+        "jsCode": "const s = $input.item.json;\nreturn {\n  client_id:     s.id || s.client_id,\n  client_number: s.number || s.client_number,\n  client_name:   s.name   || s.client_name,\n  original_message: $('Manual Trigger - WhatsApp Message').item.json.message || '',\n  media_url:        $('Manual Trigger - WhatsApp Message').item.json.media_url || ''\n};"
       },
       "id": "91191228-e5be-4a88-a2b9-23c9a609f557",
-      "name": "Merge - Datos de Cliente",
+      "name": "Merge - Client Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -1603,7 +1603,7 @@
         }
       },
       "id": "2d0741a4-2e15-4c52-8d90-f5bb9e069e63",
-      "name": "Supabase - Crear Cliente",
+      "name": "Supabase - Create Client",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -1643,7 +1643,7 @@
         "options": {}
       },
       "id": "4c3806e9-22eb-4209-95f8-9df63bf3e358",
-      "name": "Router - ¿Cliente Nuevo?",
+      "name": "IF - Is New Client?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -1653,10 +1653,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\nconst d = (items.length > 0 && items[0].json && items[0].json.id) ? items[0].json : null;\nconst num = $('Manual Trigger - Mensaje WhatsApp').item.json.number;\nif (d) return { client_id: d.id, client_number: d.number, client_name: d.name, is_new: false };\nreturn { client_id: null, client_number: num, client_name: 'Cliente ' + num, is_new: true };"
+        "jsCode": "const items = $input.all();\nconst d = (items.length > 0 && items[0].json && items[0].json.id) ? items[0].json : null;\nconst num = $('Manual Trigger - WhatsApp Message').item.json.number;\nif (d) return { client_id: d.id, client_number: d.number, client_name: d.name, is_new: false };\nreturn { client_id: null, client_number: num, client_name: 'Cliente ' + num, is_new: true };"
       },
       "id": "61ce83fa-ecdc-42ff-8bd1-474f5298d5d1",
-      "name": "Verificar Existencia Cliente",
+      "name": "Code - Check Client Existence",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -1674,13 +1674,13 @@
             {
               "keyName": "number",
               "condition": "eq",
-              "keyValue": "={{ $('Manual Trigger - Mensaje WhatsApp').item.json.number }}"
+              "keyValue": "={{ $('Manual Trigger - WhatsApp Message').item.json.number }}"
             }
           ]
         }
       },
       "id": "4e4930e8-f574-4008-ab0c-8c5cd6a2dd76",
-      "name": "Supabase - Buscar Cliente",
+      "name": "Supabase - Lookup Client",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -1719,7 +1719,7 @@
         "options": {}
       },
       "id": "538cc3a7-89ab-4f8f-8ee7-b12c97b7a919",
-      "name": "HTTP - Notificar Cliente (Confirmación Negocio)",
+      "name": "HTTP - Notify Client Payment Confirmed",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -1743,7 +1743,7 @@
         }
       },
       "id": "367dc8ea-e623-4163-8cde-dff817344252",
-      "name": "Supabase - Obtener Cliente Confirmación",
+      "name": "Supabase - Get Client for Confirmation",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -1784,7 +1784,7 @@
         }
       },
       "id": "64a12a2d-80cb-49b0-965a-fc35838de999",
-      "name": "Supabase - Confirmar Pago",
+      "name": "Supabase - Atomic Payment Confirmation RPC",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -1803,7 +1803,7 @@
         "jsCode": "const rawMsg = ($input.item.json.message || $input.item.json.button_id || '').trim();\nlet cleanMsg = rawMsg;\nif (cleanMsg.startsWith('aprobar_') || cleanMsg.startsWith('rechazar_') || cleanMsg.startsWith('despachar_') || cleanMsg.startsWith('pausar_bot_') || cleanMsg.startsWith('activar_bot_')) {\n  cleanMsg = cleanMsg.replace(/_/g, ' ');\n}\nconst parts = cleanMsg.split(/\\s+/);\nconst firstWord = (parts[0] || '').toLowerCase();\nconst secondWord = (parts[1] || '').toLowerCase();\nlet identifier = (parts[1] || '').trim();\n\nlet action = 'unknown';\nif (firstWord === 'pausar' && secondWord === 'bot') {\n  action = 'pause_bot';\n  identifier = (parts[2] || '').trim();\n} else if (firstWord === 'activar' && secondWord === 'bot') {\n  action = 'activate_bot';\n  identifier = (parts[2] || '').trim();\n} else if (['confirm_payment', 'confirmar', 'aprobar', 'aprobado', 'acepto'].includes(firstWord)) {\n  action = 'confirm_payment';\n} else if (['reject_payment', 'rechazar', 'rechazado', 'cancelar_pago'].includes(firstWord)) {\n  action = 'reject_payment';\n} else if (['despachos', 'entregas', 'pedidos', 'envios'].includes(firstWord)) {\n  action = 'view_dispatches';\n} else if (['despachar', 'enviar', 'entregar'].includes(firstWord)) {\n  action = 'dispatch_order';\n}\n\nconst isPhoneNumber = /^\\d{8,15}$/.test(identifier);\n\nreturn {\n  raw_message: rawMsg,\n  action: action,\n  identifier: identifier,\n  is_phone_number: isPhoneNumber,\n  business_number: $input.item.json.number || ''\n};"
       },
       "id": "f1ebbfdb-d428-45c4-a994-916f03371c46",
-      "name": "Parsear Comando de Negocio",
+      "name": "Code - Parse Business Command",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -1836,7 +1836,7 @@
         "options": {}
       },
       "id": "93393b70-0254-4fd5-8ebd-fb82741a8019",
-      "name": "Router - Tipo de Remitente",
+      "name": "IF - Is Business or Client?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -1847,7 +1847,7 @@
     {
       "parameters": {},
       "id": "0f0fed3e-5746-4863-b818-310a9cc3ba00",
-      "name": "Manual Trigger - Mensaje WhatsApp",
+      "name": "Manual Trigger - WhatsApp Message",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
@@ -1882,7 +1882,7 @@
         }
       },
       "id": "4fa82961-102c-405c-a4dc-ef487c1c9ba9",
-      "name": "Supabase - Actualizar Estado Sesión tras Nombre",
+      "name": "Supabase - Update Session State After Name",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -1912,7 +1912,7 @@
         "jsCode": "const item = .item.json;\nconst tenant = item.tenant || {};\nconst sender = item.sender || {};\nconst msg = item.message || {};\n\nconst senderType = sender.type || item.sender_type || (sender.number === tenant.number ? business : client);\nconst text = msg.text || item.original_message || item.message || item.text || ;\nconst number = sender.number || tenant.number || item.number || ;\nconst clientId = sender.client_id || item.client_id || null;\n\nreturn {\n  sender_type: senderType,\n  number: number,\n  message: text,\n  media_url: msg.media_url || item.media_url || ,\n  tenant: tenant,\n  sender: sender,\n  client_id: clientId\n};"
       },
       "id": "code-norm-f1",
-      "name": "Code - Normalizar Entrada Orquestador Ventas",
+      "name": "Code - Normalize Inbound Sales Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -1934,156 +1934,156 @@
     ]
   },
   "connections": {
-    "HTTP - Buscar Palabra Clave o Catálogo": {
+    "HTTP - Search Keyword or Catalog": {
       "main": [
         [
           {
-            "node": "Code - Formatear Sugerencias o Catálogo",
+            "node": "Code - Format Suggestions or Catalog",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "IF - ¿Encontró Producto Exacto?": {
+    "IF - Found Exact Product?": {
       "main": [
         [
           {
-            "node": "Code - Formatear Producto Encontrado",
+            "node": "Code - Format Found Product",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "HTTP - Buscar Palabra Clave o Catálogo",
+            "node": "HTTP - Search Keyword or Catalog",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Evaluar Resultados RPC": {
+    "Code - Evaluate RPC Results": {
       "main": [
         [
           {
-            "node": "IF - ¿Encontró Producto Exacto?",
+            "node": "IF - Found Exact Product?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Formatear Notificación Negocio": {
+    "Code - Format Business Notification": {
       "main": [
         [
           {
-            "node": "HTTP - Notificar Negocio Nueva Evidencia",
+            "node": "HTTP - Notify Business New Payment Evidence",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "HTTP - Obtener Producto para Negocio": {
+    "HTTP - Fetch Product for Business": {
       "main": [
         [
           {
-            "node": "Code - Formatear Notificación Negocio",
+            "node": "Code - Format Business Notification",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "IF - ¿Estado Correcto para Dirección?": {
+    "IF - Correct State for Address?": {
       "main": [
         [
           {
-            "node": "Supabase - Registrar Dirección",
+            "node": "Supabase - Register Delivery Address",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Code - Estado Incorrecto Dirección",
+            "node": "Code - Invalid State for Address",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "IF - ¿Nombre Genérico al Aprobar?": {
+    "IF - Generic Name on Approval?": {
       "main": [
         [
           {
-            "node": "Code - Pedir Nombre para Compra",
+            "node": "Code - Request Name for Checkout",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Supabase - Aprobar Producto",
+            "node": "Supabase - Approve Product in Session",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Rechazar Pago": {
+    "Supabase - Reject Payment": {
       "main": [
         [
           {
-            "node": "HTTP - Notificar Cliente Pago Rechazado",
+            "node": "HTTP - Notify Client Payment Rejected",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Router - Acción Negocio": {
+    "Switch - Business Action Router": {
       "main": [
         [
           {
-            "node": "Supabase - Confirmar Pago",
+            "node": "Supabase - Atomic Payment Confirmation RPC",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Supabase - Rechazar Pago",
+            "node": "Supabase - Reject Payment",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "HTTP - Notificar Negocio Error Identificador",
+            "node": "HTTP - Notify Business Invalid Identifier",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Parsear Sesión Encontrada": {
+    "Code - Parse Found Session": {
       "main": [
         [
           {
-            "node": "Router - Acción Negocio",
+            "node": "Switch - Business Action Router",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "HTTP - Buscar Sesión por ID o Teléfono": {
+    "HTTP - Lookup Session by ID or Phone": {
       "main": [
         [
           {
-            "node": "Parsear Sesión Encontrada",
+            "node": "Code - Parse Found Session",
             "type": "main",
             "index": 0
           }
@@ -2094,7 +2094,7 @@
       "ai_memory": [
         [
           {
-            "node": "AI Agent",
+            "node": "AI Agent - Sales Intent Classifier",
             "type": "ai_memory",
             "index": 0
           }
@@ -2105,647 +2105,647 @@
       "ai_languageModel": [
         [
           {
-            "node": "AI Agent",
+            "node": "AI Agent - Sales Intent Classifier",
             "type": "ai_languageModel",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Formatear Sugerencias o Catálogo": {
+    "Code - Format Suggestions or Catalog": {
       "main": [
         [
           {
-            "node": "Supabase - Guardar Sesión Búsqueda",
+            "node": "Supabase - Save Search Session",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Formatear Producto Encontrado": {
+    "Code - Format Found Product": {
       "main": [
         [
           {
-            "node": "Supabase - Guardar Sesión Búsqueda",
+            "node": "Supabase - Save Search Session",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "HTTP - Notificar Negocio Nueva Evidencia": {
+    "HTTP - Notify Business New Payment Evidence": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Estado Incorrecto Dirección": {
+    "Code - Invalid State for Address": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Registrar Dirección": {
+    "Supabase - Register Delivery Address": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Evaluar Requerimiento Dirección": {
+    "Code - Evaluate Address Requirement": {
       "main": [
         [
           {
-            "node": "Supabase - Registrar Método Pago",
+            "node": "Supabase - Register Payment Method",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Pedir Nombre para Compra": {
+    "Code - Request Name for Checkout": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "AI Agent": {
+    "AI Agent - Sales Intent Classifier": {
       "main": [
         [
           {
-            "node": "Parsear Respuesta IA",
+            "node": "Code - Parse AI Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Guardar Respuesta en Sesión": {
+    "Supabase - Save Response to Session": {
       "main": [
         [
           {
-            "node": "HTTP - Enviar Respuesta WhatsApp",
+            "node": "HTTP - Send WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Preparar Respuesta WhatsApp": {
+    "Code - Prepare WhatsApp Response": {
       "main": [
         [
           {
-            "node": "Supabase - Guardar Respuesta en Sesión",
+            "node": "Supabase - Save Response to Session",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Respuesta Fallback": {
+    "Code - Fallback Response": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Estado Incorrecto Evidence": {
+    "Code - Invalid State for Evidence": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Evidencia de Pago": {
+    "Supabase - Register Payment Evidence": {
       "main": [
         [
           {
-            "node": "HTTP - Obtener Producto para Negocio",
+            "node": "HTTP - Fetch Product for Business",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "IF - ¿Estado Correcto para Evidencia?": {
+    "IF - Correct State for Evidence?": {
       "main": [
         [
           {
-            "node": "Supabase - Evidencia de Pago",
+            "node": "Supabase - Register Payment Evidence",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Code - Estado Incorrecto Evidence",
+            "node": "Code - Invalid State for Evidence",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Estado Incorrecto Payment": {
+    "Code - Invalid State for Payment": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Registrar Método Pago": {
+    "Supabase - Register Payment Method": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "IF - ¿Estado Correcto para Pago?": {
+    "IF - Correct State for Payment?": {
       "main": [
         [
           {
-            "node": "Code - Evaluar Requerimiento Dirección",
+            "node": "Code - Evaluate Address Requirement",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Code - Estado Incorrecto Payment",
+            "node": "Code - Invalid State for Payment",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Estado Incorrecto Approve": {
+    "Code - Invalid State for Approval": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Aprobar Producto": {
+    "Supabase - Approve Product in Session": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "IF - ¿Estado Correcto para Aprobar?": {
+    "IF - Correct State for Approval?": {
       "main": [
         [
           {
-            "node": "IF - ¿Nombre Genérico al Aprobar?",
+            "node": "IF - Generic Name on Approval?",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Code - Estado Incorrecto Approve",
+            "node": "Code - Invalid State for Approval",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Confirmar Nombre Registrado": {
+    "Code - Confirm Registered Name": {
       "main": [
         [
           {
-            "node": "Supabase - Actualizar Estado Sesión tras Nombre",
+            "node": "Supabase - Update Session State After Name",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Actualizar Nombre Cliente": {
+    "Supabase - Update Client Name": {
       "main": [
         [
           {
-            "node": "Code - Confirmar Nombre Registrado",
+            "node": "Code - Confirm Registered Name",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Saludar con Nombre": {
+    "Code - Greet with Client Name": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Pedir Nombre al Cliente": {
+    "Code - Request Client Name": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "IF - ¿Nombre Genérico?": {
+    "IF - Is Generic Name?": {
       "main": [
         [
           {
-            "node": "Code - Pedir Nombre al Cliente",
+            "node": "Code - Request Client Name",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Code - Saludar con Nombre",
+            "node": "Code - Greet with Client Name",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Guardar Sesión Búsqueda": {
+    "Supabase - Save Search Session": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "HTTP - Buscar Productos (RPC)": {
+    "HTTP - Search Products RPC": {
       "main": [
         [
           {
-            "node": "Code - Evaluar Resultados RPC",
+            "node": "Code - Evaluate RPC Results",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Pedir Término de Búsqueda": {
+    "Code - Request Search Term": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "IF - ¿Tiene Término de Búsqueda?": {
+    "IF - Has Search Term?": {
       "main": [
         [
           {
-            "node": "HTTP - Buscar Productos (RPC)",
+            "node": "HTTP - Search Products RPC",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Code - Pedir Término de Búsqueda",
+            "node": "Code - Request Search Term",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Cancelar Sesión": {
+    "Supabase - Cancel Session": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Switch - Intent del Cliente": {
+    "Switch - Client Intent Router": {
       "main": [
         [
           {
-            "node": "Supabase - Cancelar Sesión",
+            "node": "Supabase - Cancel Session",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "IF - ¿Tiene Término de Búsqueda?",
+            "node": "IF - Has Search Term?",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "IF - ¿Nombre Genérico?",
+            "node": "IF - Is Generic Name?",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Supabase - Actualizar Nombre Cliente",
+            "node": "Supabase - Update Client Name",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "IF - ¿Estado Correcto para Aprobar?",
+            "node": "IF - Correct State for Approval?",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "IF - ¿Estado Correcto para Pago?",
+            "node": "IF - Correct State for Payment?",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "IF - ¿Estado Correcto para Dirección?",
+            "node": "IF - Correct State for Address?",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "IF - ¿Estado Correcto para Evidencia?",
+            "node": "IF - Correct State for Evidence?",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Code - Respuesta Fallback",
+            "node": "Code - Fallback Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Parsear Respuesta IA": {
+    "Code - Parse AI Response": {
       "main": [
         [
           {
-            "node": "Switch - Intent del Cliente",
+            "node": "Switch - Client Intent Router",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Preparar Contexto para IA": {
+    "Code - Prepare Context for AI": {
       "main": [
         [
           {
-            "node": "AI Agent",
+            "node": "AI Agent - Sales Intent Classifier",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Crear Sesión Inicial": {
+    "Supabase - Create Initial Session": {
       "main": [
         [
           {
-            "node": "Preparar Contexto para IA",
+            "node": "Code - Prepare Context for AI",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "IF - ¿Necesita Crear Sesión?": {
+    "IF - Needs Initial Session?": {
       "main": [
         [
           {
-            "node": "Supabase - Crear Sesión Inicial",
+            "node": "Supabase - Create Initial Session",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Preparar Contexto para IA",
+            "node": "Code - Prepare Context for AI",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Verificar Sesión": {
+    "Code - Verify Active Session": {
       "main": [
         [
           {
-            "node": "IF - ¿Necesita Crear Sesión?",
+            "node": "IF - Needs Initial Session?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Obtener Sesión Activa": {
+    "Supabase - Get Active Session": {
       "main": [
         [
           {
-            "node": "Code - Verificar Sesión",
+            "node": "Code - Verify Active Session",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Merge - Datos de Cliente": {
+    "Merge - Client Data": {
       "main": [
         [
           {
-            "node": "Supabase - Obtener Sesión Activa",
+            "node": "Supabase - Get Active Session",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Crear Cliente": {
+    "Supabase - Create Client": {
       "main": [
         [
           {
-            "node": "Merge - Datos de Cliente",
+            "node": "Merge - Client Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Router - ¿Cliente Nuevo?": {
+    "IF - Is New Client?": {
       "main": [
         [
           {
-            "node": "Supabase - Crear Cliente",
+            "node": "Supabase - Create Client",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Merge - Datos de Cliente",
+            "node": "Merge - Client Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Verificar Existencia Cliente": {
+    "Code - Check Client Existence": {
       "main": [
         [
           {
-            "node": "Router - ¿Cliente Nuevo?",
+            "node": "IF - Is New Client?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Buscar Cliente": {
+    "Supabase - Lookup Client": {
       "main": [
         [
           {
-            "node": "Verificar Existencia Cliente",
+            "node": "Code - Check Client Existence",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Obtener Cliente Confirmación": {
+    "Supabase - Get Client for Confirmation": {
       "main": [
         [
           {
-            "node": "HTTP - Notificar Cliente (Confirmación Negocio)",
+            "node": "HTTP - Notify Client Payment Confirmed",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Confirmar Pago": {
+    "Supabase - Atomic Payment Confirmation RPC": {
       "main": [
         [
           {
-            "node": "Supabase - Obtener Cliente Confirmación",
+            "node": "Supabase - Get Client for Confirmation",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Parsear Comando de Negocio": {
+    "Code - Parse Business Command": {
       "main": [
         [
           {
-            "node": "HTTP - Buscar Sesión por ID o Teléfono",
+            "node": "HTTP - Lookup Session by ID or Phone",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Router - Tipo de Remitente": {
+    "IF - Is Business or Client?": {
       "main": [
         [
           {
-            "node": "Parsear Comando de Negocio",
+            "node": "Code - Parse Business Command",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Supabase - Buscar Cliente",
+            "node": "Supabase - Lookup Client",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Manual Trigger - Mensaje WhatsApp": {
+    "Manual Trigger - WhatsApp Message": {
       "main": [
         [
           {
-            "node": "Code - Normalizar Entrada Orquestador Ventas",
+            "node": "Code - Normalize Inbound Sales Request",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase - Actualizar Estado Sesión tras Nombre": {
+    "Supabase - Update Session State After Name": {
       "main": [
         [
           {
-            "node": "Preparar Respuesta WhatsApp",
+            "node": "Code - Prepare WhatsApp Response",
             "type": "main",
             "index": 0
           }
@@ -2756,18 +2756,18 @@
       "main": [
         [
           {
-            "node": "Code - Normalizar Entrada Orquestador Ventas",
+            "node": "Code - Normalize Inbound Sales Request",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code - Normalizar Entrada Orquestador Ventas": {
+    "Code - Normalize Inbound Sales Request": {
       "main": [
         [
           {
-            "node": "Router - Tipo de Remitente",
+            "node": "IF - Is Business or Client?",
             "type": "main",
             "index": 0
           }

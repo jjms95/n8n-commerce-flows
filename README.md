@@ -22,11 +22,11 @@ A complete, production-ready, multi-tenant conversational automation ecosystem f
 .
 ├── README.md                           # 📖 Main Project Documentation
 ├── supabase_setup.sql                  # 🗄️ Database DDL, RLS Policies, Indexes & RPC Functions
-├── flujo0_orquestador_whatsapp.json    # 🔀 Master Orchestrator (Meta Webhook GET/POST + AI Classifier)
-├── flujo1_ventas_estados.json          # 🛒 7-State Conversational Sales Machine & Atomic Checkout
-├── flujo2_crud_productos.json          # 📦 Catalog Management & Relative Stock (+/-)
-├── flujo3_reportes_automatizados.json  # 📊 Automated Daily Financial Reports (6:00 PM Cron)
-├── flujo4_agendamiento_citas.json      # 📅 Commercial Booking with Anti-Collision (±29 min)
+├── flow0_whatsapp_orchestrator.json    # 🔀 Master Orchestrator (Meta Webhook GET/POST + AI Classifier)
+├── flow1_sales_state_machine.json      # 🛒 7-State Conversational Sales Machine & Atomic Checkout
+├── flow2_product_catalog_crud.json     # 📦 Catalog Management & Relative Stock (+/-)
+├── flow3_automated_reports.json        # 📊 Automated Daily Financial Reports (6:00 PM Cron)
+├── flow4_appointment_booking.json      # 📅 Commercial Booking with Anti-Collision (±29 min)
 └── docs/                               # 📚 Detailed Technical Documentation
     ├── production_deployment.md        # 🌐 Server Deployment, SSL & Meta Webhook Verification
     ├── flow_architecture.md            # 🏗️ Architecture, State Machine & Multi-Tenant Model

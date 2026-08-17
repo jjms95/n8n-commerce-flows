@@ -1,5 +1,5 @@
 {
-  "name": "Flujo 3 - Reportes Automatizados",
+  "name": "Flow 3 - Automated Financial & Operational Reports",
   "nodes": [
     {
       "parameters": {
@@ -15,7 +15,7 @@
         }
       },
       "id": "trigger-schedule-reports",
-      "name": "Schedule Trigger - Reporte Diario 6PM",
+      "name": "Schedule Trigger - Daily 6PM Report",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
@@ -24,11 +24,22 @@
       ]
     },
     {
+      "parameters": {},
+      "id": "exec-wf-trigger-f3",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        150
+      ]
+    },
+    {
       "parameters": {
         "jsCode": "const now          = new Date();\nconst last24h      = new Date(now.getTime() - 24 * 60 * 60 * 1000);\nconst last7d       = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);\nconst startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);\nreturn {\n  now:            now.toISOString(),\n  last24h:        last24h.toISOString(),\n  last7d:         last7d.toISOString(),\n  start_of_month: startOfMonth.toISOString(),\n  report_date:    now.toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })\n};"
       },
       "id": "calculate-date-ranges",
-      "name": "Calcular Rangos de Fechas",
+      "name": "Code - Compute Date Ranges",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -52,7 +63,7 @@
         "returnAll": true
       },
       "id": "supabase-get-confirmed-sales",
-      "name": "Supabase - Ventas Confirmadas (Total)",
+      "name": "Supabase - Confirmed Sales (Total)",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -74,7 +85,7 @@
         "returnAll": true
       },
       "id": "supabase-get-all-clients",
-      "name": "Supabase - Total de Clientes",
+      "name": "Supabase - Total Clients",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -104,7 +115,7 @@
         "returnAll": true
       },
       "id": "supabase-get-active-sessions",
-      "name": "Supabase - Sesiones Activas",
+      "name": "Supabase - Active Sessions Funnel",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -134,7 +145,7 @@
         "returnAll": true
       },
       "id": "supabase-get-active-products",
-      "name": "Supabase - Productos Activos",
+      "name": "Supabase - Active Products Catalog",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -150,10 +161,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const salesItems    = $('Consultar Ventas del Día').all().map(i => i.json).filter(s => s && s.id);\nconst clientItems   = $('Consultar Nuevos Clientes del Día').all().map(i => i.json).filter(c => c && c.id);\nconst sessionItems  = $('Consultar Sesiones del Día').all().map(i => i.json).filter(s => s && s.id);\nconst productItems  = $('Consultar Estado de Inventario').all().map(i => i.json).filter(p => p && p.id);\nconst dateInfo      = $('Calcular Rangos de Fechas').item.json;\n\nconst totalSales   = salesItems.length;\nconst totalClients = clientItems.length;\n\nconst sessionsByStatus = {};\nsessionItems.forEach(item => {\n  const status = item.status || 'unknown';\n  sessionsByStatus[status] = (sessionsByStatus[status] || 0) + 1;\n});\n\nconst pendingConfirmation = sessionsByStatus['waiting_business_confirmation'] || 0;\nconst waitingPayment      = sessionsByStatus['waiting_payment_evidence']      || 0;\nconst selectingPayment    = sessionsByStatus['select_payment']                || 0;\nconst browsingProducts    = sessionsByStatus['waiting_product_approval']      || 0;\n\nconst activeProducts     = productItems.length;\nconst lowStockProducts   = productItems.filter(p => parseInt(p.stock) <= 5 && parseInt(p.stock) > 0).length;\nconst outOfStockProducts = productItems.filter(p => parseInt(p.stock) === 0).length;\n\nconst sep = '━'.repeat(28);\nconst report = `📊 *REPORTE FINANCIERO Y OPERATIVO*\\n${sep}\\n` +\n`📅 *Fecha:* ${dateInfo.today_str || 'Hoy'}\\n\\n` +\n`💰 *Ventas Confirmadas:* ${totalSales}\\n` +\n`👥 *Nuevos Clientes:* ${totalClients}\\n\\n` +\n`🔄 *Embudo de Compras:*\\n` +\n`• ⏳ Pagos por verificar: ${pendingConfirmation}\\n` +\n`• 📸 Esperando comprobante: ${waitingPayment}\\n` +\n`• 💳 Seleccionando pago: ${selectingPayment}\\n` +\n`• 🛍️ Explorando productos: ${browsingProducts}\\n\\n` +\n`📦 *Inventario:*\\n` +\n`• Activos: ${activeProducts}\\n` +\n`• ⚠️ Stock Crítico (≤5): ${lowStockProducts}\\n` +\n`• ⛔ Sin Stock: ${outOfStockProducts}`;\n\nconst buttons = [\n  { id: \"tareas\", title: \"📋 Ver Pendientes\" },\n  { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n  { id: \"ver citas\", title: \"📅 Ver Citas\" }\n];\n\nreturn {\n  wa_number: ($('Calcular Rangos de Fechas').item.json.tenant ? $('Calcular Rangos de Fechas').item.json.tenant.number : ($json.tenant ? $json.tenant.number : ($json.wa_number || '521234567890'))),\n  wa_message: report,\n  buttons: buttons,\n  phone_number_id: ($('Calcular Rangos de Fechas').item.json.tenant ? $('Calcular Rangos de Fechas').item.json.tenant.whatsapp_phone_number_id : ($json.tenant ? $json.tenant.whatsapp_phone_number_id : ($json.phone_number_id || '10023456789'))),\n  access_token: ($('Calcular Rangos de Fechas').item.json.tenant ? $('Calcular Rangos de Fechas').item.json.tenant.whatsapp_access_token : ($json.tenant ? $json.tenant.whatsapp_access_token : ($json.access_token || 'EAAG_DEMO_TOKEN')))\n};"
+        "jsCode": "const salesItems    = $('Supabase - Confirmed Sales (Total)').all().map(i => i.json).filter(s => s && s.id);\nconst clientItems   = $('Supabase - Total Clients').all().map(i => i.json).filter(c => c && c.id);\nconst sessionItems  = $('Supabase - Active Sessions Funnel').all().map(i => i.json).filter(s => s && s.id);\nconst productItems  = $('Supabase - Active Products Catalog').all().map(i => i.json).filter(p => p && p.id);\nconst dateInfo      = $('Code - Compute Date Ranges').item.json;\n\nconst totalSales   = salesItems.length;\nconst totalClients = clientItems.length;\n\nconst sessionsByStatus = {};\nsessionItems.forEach(item => {\n  const status = item.status || 'unknown';\n  sessionsByStatus[status] = (sessionsByStatus[status] || 0) + 1;\n});\n\nconst pendingConfirmation = sessionsByStatus['waiting_business_confirmation'] || 0;\nconst waitingPayment      = sessionsByStatus['waiting_payment_evidence']      || 0;\nconst selectingPayment    = sessionsByStatus['select_payment']                || 0;\nconst browsingProducts    = sessionsByStatus['waiting_product_approval']      || 0;\n\nconst activeProducts     = productItems.length;\nconst lowStockProducts   = productItems.filter(p => parseInt(p.stock) <= 5 && parseInt(p.stock) > 0).length;\nconst outOfStockProducts = productItems.filter(p => parseInt(p.stock) === 0).length;\n\nconst sep = '━'.repeat(28);\nconst report = `📊 *REPORTE FINANCIERO Y OPERATIVO*\\n${sep}\\n` +\n`📅 *Fecha:* ${dateInfo.report_date || 'Hoy'}\\n\\n` +\n`💰 *Ventas Confirmadas:* ${totalSales}\\n` +\n`👥 *Nuevos Clientes:* ${totalClients}\\n\\n` +\n`🔄 *Embudo de Compras:*\\n` +\n`• ⏳ Pagos por verificar: ${pendingConfirmation}\\n` +\n`• 📸 Esperando comprobante: ${waitingPayment}\\n` +\n`• 💳 Seleccionando pago: ${selectingPayment}\\n` +\n`• 🛍️ Explorando productos: ${browsingProducts}\\n\\n` +\n`📦 *Inventario:*\\n` +\n`• Activos: ${activeProducts}\\n` +\n`• ⚠️ Stock Crítico (≤5): ${lowStockProducts}\\n` +\n`• ⛔ Sin Stock: ${outOfStockProducts}`;\n\nconst buttons = [\n  { id: \"tareas\", title: \"📋 Ver Pendientes\" },\n  { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n  { id: \"ver citas\", title: \"📅 Ver Citas\" }\n];\n\nreturn {\n  wa_number: ($('Code - Compute Date Ranges').item.json.tenant ? $('Code - Compute Date Ranges').item.json.tenant.number : ($json.tenant ? $json.tenant.number : ($json.wa_number || '521234567890'))),\n  wa_message: report,\n  buttons: buttons,\n  phone_number_id: ($('Code - Compute Date Ranges').item.json.tenant ? $('Code - Compute Date Ranges').item.json.tenant.whatsapp_phone_number_id : ($json.tenant ? $json.tenant.whatsapp_phone_number_id : ($json.phone_number_id || '10023456789'))),\n  access_token: ($('Code - Compute Date Ranges').item.json.tenant ? $('Code - Compute Date Ranges').item.json.tenant.whatsapp_access_token : ($json.tenant ? $json.tenant.whatsapp_access_token : ($json.access_token || 'EAAG_DEMO_TOKEN')))\n};"
       },
       "id": "aggregate-report-metrics",
-      "name": "Agregar Métricas del Reporte",
+      "name": "Code - Aggregate Report Metrics",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -185,113 +196,21 @@
         "options": {}
       },
       "id": "http-send-report-whatsapp",
-      "name": "HTTP - Enviar Reporte WhatsApp Admin",
+      "name": "HTTP - Send WhatsApp Admin Report",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
         1220,
         450
       ]
-    },
-    {
-      "parameters": {},
-      "id": "exec-wf-trigger-f3",
-      "name": "Execute Workflow Trigger",
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1,
-      "position": [
-        240,
-        150
-      ]
     }
   ],
   "connections": {
-    "Schedule Trigger - Reporte Diario 6PM": {
+    "Schedule Trigger - Daily 6PM Report": {
       "main": [
         [
           {
-            "node": "Calcular Rangos de Fechas",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Calcular Rangos de Fechas": {
-      "main": [
-        [
-          {
-            "node": "Supabase - Ventas Confirmadas (Total)",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Supabase - Total de Clientes",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Supabase - Sesiones Activas",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Supabase - Productos Activos",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Supabase - Ventas Confirmadas (Total)": {
-      "main": [
-        [
-          {
-            "node": "Agregar Métricas del Reporte",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Supabase - Total de Clientes": {
-      "main": [
-        [
-          {
-            "node": "Agregar Métricas del Reporte",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Supabase - Sesiones Activas": {
-      "main": [
-        [
-          {
-            "node": "Agregar Métricas del Reporte",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Supabase - Productos Activos": {
-      "main": [
-        [
-          {
-            "node": "Agregar Métricas del Reporte",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Agregar Métricas del Reporte": {
-      "main": [
-        [
-          {
-            "node": "HTTP - Enviar Reporte WhatsApp Admin",
+            "node": "Code - Compute Date Ranges",
             "type": "main",
             "index": 0
           }
@@ -302,7 +221,88 @@
       "main": [
         [
           {
-            "node": "Calcular Rangos de Fechas",
+            "node": "Code - Compute Date Ranges",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Compute Date Ranges": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Confirmed Sales (Total)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Supabase - Total Clients",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Supabase - Active Sessions Funnel",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Supabase - Active Products Catalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Confirmed Sales (Total)": {
+      "main": [
+        [
+          {
+            "node": "Code - Aggregate Report Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Total Clients": {
+      "main": [
+        [
+          {
+            "node": "Code - Aggregate Report Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Active Sessions Funnel": {
+      "main": [
+        [
+          {
+            "node": "Code - Aggregate Report Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Active Products Catalog": {
+      "main": [
+        [
+          {
+            "node": "Code - Aggregate Report Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Aggregate Report Metrics": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Send WhatsApp Admin Report",
             "type": "main",
             "index": 0
           }
@@ -313,11 +313,9 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "staticData": null,
   "tags": [
     "reports",
     "schedule",
     "analytics"
-  ],
-  "pinData": {}
+  ]
 }
