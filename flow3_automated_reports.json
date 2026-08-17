@@ -75,7 +75,8 @@
           "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -97,7 +98,8 @@
           "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -127,7 +129,8 @@
           "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -157,7 +160,8 @@
           "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
