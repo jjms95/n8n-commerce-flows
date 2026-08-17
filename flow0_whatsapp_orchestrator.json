@@ -244,7 +244,8 @@
     },
     {
       "parameters": {
-        "sessionIdType": "customKey"
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $workflow.id }}"
       },
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
       "typeVersion": 1.4,
