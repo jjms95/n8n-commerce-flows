@@ -500,7 +500,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const bizCmd = $('Code - Parse Business Command').item.json;\nconst items  = $input.all();\nlet sessionData = null;\n\nif (items.length > 0 && Array.isArray(items[0].json)) {\n  sessionData = items[0].json[0] || null;\n} else if (items.length > 0 && items[0].json && items[0].json.id) {\n  sessionData = items[0].json;\n}\n\nif (!sessionData) {\n  return {\n    found: false,\n    action: bizCmd.action,\n    identifier: bizCmd.identifier,\n    biz_message: `⚠️ No se encontró ninguna sesión activa pendiente de confirmación con el identificador: \"${bizCmd.identifier}\".`\n  };\n}\n\nconst clientObj = Array.isArray(sessionData.clients) ? sessionData.clients[0] : (sessionData.clients || {});\n\nreturn {\n  found: true,\n  session_id: sessionData.id,\n  client_id: sessionData.client_id,\n  client_number: clientObj.number || '',\n  client_name: clientObj.name || 'Cliente',\n  action: bizCmd.action,\n  identifier: bizCmd.identifier\n};"
+        "jsCode": "const bizCmd = $('Code - Parse Business Command').item.json;\nconst items  = $input.all();\nlet sessionData = null;\n\nif (items.length > 0 && Array.isArray(items[0].json)) {\n  sessionData = items[0].json[0] || null;\n} else if (items.length > 0 && items[0].json && items[0].json.id) {\n  sessionData = items[0].json;\n}\n\nif (!sessionData && (bizCmd.action === 'confirm_payment' || bizCmd.action === 'reject_payment')) {\n  return {\n    found: false,\n    action: bizCmd.action,\n    identifier: bizCmd.identifier,\n    biz_message: `⚠️ No se encontró ninguna sesión pendiente con el identificador: \"${bizCmd.identifier}\".\\n\\n💡 Escribe \\`tareas\\` para ver los pedidos pendientes.`\n  };\n}\n\nreturn {\n  found: !!sessionData,\n  session_id: sessionData ? sessionData.id : bizCmd.identifier,\n  client_id: sessionData ? sessionData.client_id : null,\n  client_number: sessionData ? (sessionData.client_number || sessionData.number || '') : '',\n  action: bizCmd.action,\n  identifier: bizCmd.identifier,\n  tenant: bizCmd.tenant\n};"
       },
       "id": "0c33f7b9-93c3-4afe-9bd8-925e1baf558a",
       "name": "Code - Parse Found Session",
@@ -513,15 +513,22 @@
     },
     {
       "parameters": {
-        "url": "={{ $json.is_phone_number \n  ? 'https://YOUR_PROJECT_ID.supabase.co/rest/v1/sessions?select=id,client_id,status,clients!inner(number,name)&clients.number=eq.' + $json.identifier + '&status=eq.waiting_business_confirmation&order=created_at.desc&limit=1'\n  : 'https://YOUR_PROJECT_ID.supabase.co/rest/v1/sessions?select=id,client_id,status,clients(number,name)&id=eq.' + $json.identifier + '&limit=1'\n}}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "supabaseApi",
-        "options": {}
+        "operation": "getAll",
+        "tableId": "sessions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.identifier }}"
+            }
+          ]
+        }
       },
       "id": "6a61fade-e1f0-4915-82d9-e6a59e3ea713",
-      "name": "HTTP - Lookup Session by ID or Phone",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "name": "Supabase - Lookup Session by ID",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
       "position": [
         -14576,
         5552
@@ -1800,7 +1807,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const rawMsg = ($input.item.json.message || $input.item.json.button_id || '').trim();\nlet cleanMsg = rawMsg;\nif (cleanMsg.startsWith('aprobar_') || cleanMsg.startsWith('rechazar_') || cleanMsg.startsWith('despachar_') || cleanMsg.startsWith('pausar_bot_') || cleanMsg.startsWith('activar_bot_')) {\n  cleanMsg = cleanMsg.replace(/_/g, ' ');\n}\nconst parts = cleanMsg.split(/\\s+/);\nconst firstWord = (parts[0] || '').toLowerCase();\nconst secondWord = (parts[1] || '').toLowerCase();\nlet identifier = (parts[1] || '').trim();\n\nlet action = 'unknown';\nif (firstWord === 'pausar' && secondWord === 'bot') {\n  action = 'pause_bot';\n  identifier = (parts[2] || '').trim();\n} else if (firstWord === 'activar' && secondWord === 'bot') {\n  action = 'activate_bot';\n  identifier = (parts[2] || '').trim();\n} else if (['confirm_payment', 'confirmar', 'aprobar', 'aprobado', 'acepto'].includes(firstWord)) {\n  action = 'confirm_payment';\n} else if (['reject_payment', 'rechazar', 'rechazado', 'cancelar_pago'].includes(firstWord)) {\n  action = 'reject_payment';\n} else if (['despachos', 'entregas', 'pedidos', 'envios'].includes(firstWord)) {\n  action = 'view_dispatches';\n} else if (['despachar', 'enviar', 'entregar'].includes(firstWord)) {\n  action = 'dispatch_order';\n}\n\nconst isPhoneNumber = /^\\d{8,15}$/.test(identifier);\n\nreturn {\n  raw_message: rawMsg,\n  action: action,\n  identifier: identifier,\n  is_phone_number: isPhoneNumber,\n  business_number: $input.item.json.number || ''\n};"
+        "jsCode": "const rawMsg = ($input.item.json.message || $input.item.json.button_id || '').trim();\nlet cleanMsg = rawMsg;\nif (cleanMsg.startsWith('aprobar_') || cleanMsg.startsWith('rechazar_') || cleanMsg.startsWith('despachar_') || cleanMsg.startsWith('pausar_bot_') || cleanMsg.startsWith('activar_bot_')) {\n  cleanMsg = cleanMsg.replace(/_/g, ' ');\n}\nconst parts = cleanMsg.split(/\\s+/);\nconst firstWord = (parts[0] || '').toLowerCase();\nconst secondWord = (parts[1] || '').toLowerCase();\nlet identifier = (parts[1] || '').trim();\n\nlet action = 'view_tasks'; // default fallback for business\n\nif (firstWord === 'pausar' && secondWord === 'bot') {\n  action = 'pause_bot';\n  identifier = (parts[2] || '').trim();\n} else if (firstWord === 'activar' && secondWord === 'bot') {\n  action = 'activate_bot';\n  identifier = (parts[2] || '').trim();\n} else if (['confirm_payment', 'confirmar', 'aprobar', 'aprobado', 'acepto'].includes(firstWord)) {\n  action = 'confirm_payment';\n} else if (['reject_payment', 'rechazar', 'rechazado', 'cancelar_pago'].includes(firstWord)) {\n  action = 'reject_payment';\n} else if (['despachos', 'entregas', 'envios', 'despacho'].includes(firstWord)) {\n  action = 'view_dispatches';\n} else if (['despachar', 'enviar', 'entregar'].includes(firstWord)) {\n  action = 'dispatch_order';\n} else if (['tareas', 'pendientes', 'pedidos', 'comprobantes', 'pagos', 'ver tareas'].includes(firstWord) || rawMsg.toLowerCase().includes('tarea') || rawMsg.toLowerCase().includes('pendiente')) {\n  action = 'view_tasks';\n}\n\nconst isPhoneNumber = /^\\d{8,15}$/.test(identifier);\n\nreturn {\n  raw_message: rawMsg,\n  action: action,\n  identifier: identifier,\n  is_phone_number: isPhoneNumber,\n  business_number: $input.item.json.number || '',\n  tenant: $input.item.json.tenant || {}\n};"
       },
       "id": "f1ebbfdb-d428-45c4-a994-916f03371c46",
       "name": "Code - Parse Business Command",
@@ -2073,17 +2080,6 @@
         [
           {
             "node": "Switch - Business Action Router",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "HTTP - Lookup Session by ID or Phone": {
-      "main": [
-        [
-          {
-            "node": "Code - Parse Found Session",
             "type": "main",
             "index": 0
           }
@@ -2705,7 +2701,7 @@
       "main": [
         [
           {
-            "node": "HTTP - Lookup Session by ID or Phone",
+            "node": "Supabase - Lookup Session by ID",
             "type": "main",
             "index": 0
           }
