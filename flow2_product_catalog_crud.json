@@ -88,7 +88,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const norm = $('Code - Normalize Inbound CRUD Request').item.json;\nconst rawOutput = $input.item.json.output || $input.item.json.text || '';\nconst rawMsg = (norm.original_message || '').trim();\nconst lower = rawMsg.toLowerCase();\n\nlet action = '';\nlet productName = '';\nlet price = 0;\nlet stock = 0;\nlet qtyChange = 0;\n\n// Helper to parse numbers like \"500 mil\", \"500000\", \"50k\", \"1.5 millones\", \"$500.000\"\nfunction parseMoney(str) {\n  if (!str) return 0;\n  let s = str.toLowerCase().replace(/[$ pesos]/g, '').trim();\n  if (s.includes('millon') || s.includes('millones')) {\n    const num = parseFloat(s.replace(/millon(es)?/g, '').trim());\n    return num * 1000000;\n  }\n  if (s.includes('mil') || s.includes('k')) {\n    const num = parseFloat(s.replace(/(mil|k)/g, '').trim());\n    return num * 1000;\n  }\n  if (/^\\d{1,3}(\\.\\d{3})+$/.test(s)) {\n    s = s.replace(/\\./g, '');\n  }\n  return parseFloat(s) || 0;\n}\n\n// 1. FAST REGEX & NATURAL LANGUAGE PARSER\nif (lower === 'ver inventario' || lower === 'inventario' || lower === 'catalogo' || lower === 'catálogo' || lower === 'ver productos' || lower === 'listar' || lower === 'productos') {\n  action = 'LIST';\n} else if (lower.startsWith('crear producto') || lower.startsWith('agregar producto') || lower.startsWith('nuevo producto')) {\n  action = 'CREATE';\n  \n  // Extract Stock: e.g. \"stock de 30\", \"stock 30\", \"30 unidades\", \"con 30 unidades\"\n  const stockMatch = rawMsg.match(/(?:un\\s+)?stock\\s+(?:de\\s+|en\\s+)?(\\d+)|(?:con\\s+)?(\\d+)\\s+unidades/i);\n  if (stockMatch) {\n    stock = parseInt(stockMatch[1] || stockMatch[2], 10);\n  }\n  \n  // Extract Price: e.g. \"precio de 500 mil pesos\", \"precio 50000\", \"valor 120k\", \"por 120.000\"\n  const priceMatch = rawMsg.match(/(?:con\\s+)?(?:precio|valor)\\s+(?:de\\s+|en\\s+)?(\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?(?:\\s+pesos)?)|(?:por\\s+(\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?))/i);\n  if (priceMatch) {\n    price = parseMoney(priceMatch[1] || priceMatch[2]);\n  }\n  \n  // Clean product name\n  let namePart = rawMsg\n    .replace(/^(?:crear|agregar|nuevo)\\s+producto\\s+/i, '')\n    .replace(/,?\\s*(?:con\\s+)?(?:precio|valor)\\s+(?:de\\s+|en\\s+)?\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?(?:\\s+pesos)?/gi, '')\n    .replace(/,?\\s*(?:y\\s+)?(?:un\\s+)?stock\\s+(?:de\\s+|en\\s+)?\\d+(?:\\s+unidades)?/gi, '')\n    .replace(/,?\\s*(?:con\\s+)?\\d+\\s+unidades/gi, '')\n    .replace(/,?\\s*por\\s+\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?/gi, '')\n    .replace(/^[\\s,;:\"'-]+|[\\s,;:\"'-]+$/g, '')\n    .trim();\n    \n  productName = namePart || 'Producto Nuevo';\n  productName = productName.charAt(0).toUpperCase() + productName.slice(1);\n  \n} else if (lower.startsWith('agregar stock') || lower.startsWith('sumar stock') || lower.startsWith('añadir stock')) {\n  action = 'ADJUST_STOCK';\n  const m = rawMsg.match(/(?:agregar|sumar|añadir)\\s+stock\\s+(?:de\\s+)?(\\d+)\\s+(?:a|al|para)\\s+(.+)$/i);\n  if (m) {\n    qtyChange = parseInt(m[1], 10);\n    productName = m[2].replace(/^[\\s\"']+|[\\s\"']+$/g, '').trim();\n  }\n} else if (lower.startsWith('restar stock') || lower.startsWith('quitar stock') || lower.startsWith('reducir stock') || lower.startsWith('descontar stock')) {\n  action = 'ADJUST_STOCK';\n  const m = rawMsg.match(/(?:restar|quitar|reducir|descontar)\\s+stock\\s+(?:de\\s+)?(\\d+)\\s+(?:a|al|de|del)\\s+(.+)$/i);\n  if (m) {\n    qtyChange = -Math.abs(parseInt(m[1], 10));\n    productName = m[2].replace(/^[\\s\"']+|[\\s\"']+$/g, '').trim();\n  }\n} else if (lower.startsWith('cambiar precio') || lower.startsWith('actualizar precio')) {\n  action = 'UPDATE_PRICE';\n  const m = rawMsg.match(/(?:cambiar|actualizar)\\s+precio\\s+de\\s+(.+?)\\s+a\\s+(\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?(?:\\s+pesos)?)$/i);\n  if (m) {\n    productName = m[1].replace(/^[\\s\"']+|[\\s\"']+$/g, '').trim();\n    price = parseMoney(m[2]);\n  }\n} else if (lower.startsWith('eliminar producto') || lower.startsWith('borrar producto') || lower.startsWith('desactivar producto') || lower.startsWith('eliminar ') || lower.startsWith('borrar ') || lower.startsWith('desactivar ') || lower === 'eliminar todo' || lower === 'borrar todo') {\n  action = 'DELETE';\n  if (lower === 'eliminar todo' || lower === 'borrar todo') {\n    productName = ''; // Delete all\n  } else {\n    productName = rawMsg\n      .replace(/^(?:eliminar|borrar|desactivar)(?:\\s+producto)?\\s+/i, '')\n      .replace(/^[\\s\"']+|[\\s\"']+$/g, '')\n      .trim();\n  }\n}\n\n// 2. Fallback to LLM if natural language couldn't be parsed\nif (!action && rawOutput) {\n  try {\n    const jsonMatch = rawOutput.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      const parsed = JSON.parse(jsonMatch[0]);\n      action = parsed.action || 'LIST';\n      productName = (parsed.product_name || '').trim();\n      price = parseFloat(parsed.price || 0);\n      stock = parseInt(parsed.stock || 0, 10);\n      qtyChange = parsed.quantity_change || 0;\n    }\n  } catch(e) {}\n}\n\nif (!action) action = 'LIST';\n\nreturn {\n  action: action,\n  product_name: productName,\n  price: price,\n  stock: stock,\n  quantity_change: qtyChange,\n  wa_number: norm.wa_number,\n  tenant_id: norm.tenant_id,\n  tenant_name: norm.tenant_name,\n  whatsapp_phone_number_id: norm.whatsapp_phone_number_id,\n  whatsapp_access_token: norm.whatsapp_access_token\n};"
+        "jsCode": "const norm = $('Code - Normalize Inbound CRUD Request').item.json;\nconst rawOutput = $input.item.json.output || $input.item.json.text || '';\nconst rawMsg = (norm.original_message || '').trim();\nconst lower = rawMsg.toLowerCase();\n\nlet action = '';\nlet productName = '';\nlet price = 0;\nlet stock = 0;\nlet qtyChange = 0;\n\n// Helper to parse numbers like \"500 mil\", \"500000\", \"50k\", \"1.5 millones\", \"$500.000\"\nfunction parseMoney(str) {\n  if (!str) return 0;\n  let s = str.toLowerCase().replace(/[$ pesos]/g, '').trim();\n  if (s.includes('millon') || s.includes('millones')) {\n    const num = parseFloat(s.replace(/millon(es)?/g, '').trim());\n    return num * 1000000;\n  }\n  if (s.includes('mil') || s.includes('k')) {\n    const num = parseFloat(s.replace(/(mil|k)/g, '').trim());\n    return num * 1000;\n  }\n  if (/^\\d{1,3}(\\.\\d{3})+$/.test(s)) {\n    s = s.replace(/\\./g, '');\n  }\n  return parseFloat(s) || 0;\n}\n\n// 1. FAST REGEX & NATURAL LANGUAGE PARSER\nif (lower === 'ver inventario' || lower === 'inventario' || lower === 'catalogo' || lower === 'catálogo' || lower === 'ver productos' || lower === 'listar' || lower === 'productos') {\n  action = 'LIST';\n} else if (lower.startsWith('crear producto') || lower.startsWith('agregar producto') || lower.startsWith('nuevo producto') || lower.startsWith('crear ') || lower.startsWith('nuevo ')) {\n  action = 'CREATE';\n  \n  // Extract Stock: e.g. \"stock de 30\", \"stock 30\", \"30 unidades\", \"con 30 unidades\"\n  const stockMatch = rawMsg.match(/(?:un\\s+)?stock\\s+(?:de\\s+|en\\s+)?(\\d+)|(?:con\\s+)?(\\d+)\\s+unidades/i);\n  if (stockMatch) {\n    stock = parseInt(stockMatch[1] || stockMatch[2], 10);\n  }\n  \n  // Extract Price: e.g. \"precio de 500 mil pesos\", \"precio 50000\", \"valor 120k\", \"por 120.000\"\n  const priceMatch = rawMsg.match(/(?:con\\s+)?(?:precio|valor)\\s+(?:de\\s+|en\\s+)?(\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?(?:\\s+pesos)?)|(?:por\\s+(\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?))/i);\n  if (priceMatch) {\n    price = parseMoney(priceMatch[1] || priceMatch[2]);\n  }\n  \n  // Clean product name\n  let namePart = rawMsg\n    .replace(/^(?:crear|agregar|nuevo)(?:\\s+producto)?\\s+/i, '')\n    .replace(/,?\\s*(?:con\\s+)?(?:precio|valor)\\s+(?:de\\s+|en\\s+)?\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?(?:\\s+pesos)?/gi, '')\n    .replace(/,?\\s*(?:y\\s+)?(?:un\\s+)?stock\\s+(?:de\\s+|en\\s+)?\\d+(?:\\s+unidades)?/gi, '')\n    .replace(/,?\\s*(?:con\\s+)?\\d+\\s+unidades/gi, '')\n    .replace(/,?\\s*por\\s+\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?/gi, '')\n    .replace(/^[\\s,;:\"'-]+|[\\s,;:\"'-]+$/g, '')\n    .trim();\n    \n  productName = namePart || 'Producto Nuevo';\n  productName = productName.charAt(0).toUpperCase() + productName.slice(1);\n  \n} else if (\n  lower.startsWith('agregar') || lower.startsWith('sumar') || lower.startsWith('poner') || lower.startsWith('añadir') || lower.startsWith('+')\n) {\n  action = 'ADJUST_STOCK';\n  const m = rawMsg.match(/(?:agregar|sumar|poner|añadir|\\+)\\s*(?:(\\d+)\\s*(?:de\\s+)?(?:stock|unidades)?|stock\\s*(?:de\\s+)?(\\d+))\\s*(?:a|al|para|en)?\\s*(.+)$/i);\n  if (m) {\n    qtyChange = parseInt(m[1] || m[2], 10);\n    productName = (m[3] || '').replace(/^[\\s\"']+|[\\s\"']+$/g, '').trim();\n  } else {\n    productName = rawMsg.replace(/^(?:agregar|sumar|poner|añadir|\\+)(?:\\s+stock)?\\s+/i, '').replace(/^[\\s\"']+|[\\s\"']+$/g, '').trim();\n    qtyChange = 5;\n  }\n} else if (\n  lower.startsWith('restar') || lower.startsWith('quitar') || lower.startsWith('reducir') || lower.startsWith('descontar') || lower.startsWith('-')\n) {\n  action = 'ADJUST_STOCK';\n  const m = rawMsg.match(/(?:restar|quitar|reducir|descontar|-)\\s*(?:(\\d+)\\s*(?:de\\s+)?(?:stock|unidades)?|stock\\s*(?:de\\s+)?(\\d+))\\s*(?:a|al|de|del|en)?\\s*(.+)$/i);\n  if (m) {\n    qtyChange = -Math.abs(parseInt(m[1] || m[2], 10));\n    productName = (m[3] || '').replace(/^[\\s\"']+|[\\s\"']+$/g, '').trim();\n  } else {\n    productName = rawMsg.replace(/^(?:restar|quitar|reducir|descontar|-)(?:\\s+stock)?\\s+/i, '').replace(/^[\\s\"']+|[\\s\"']+$/g, '').trim();\n    qtyChange = -1;\n  }\n} else if (lower.includes('precio')) {\n  action = 'UPDATE_PRICE';\n  const m = rawMsg.match(/(?:cambiar|actualizar|modificar)?\\s*precio\\s*(?:de|del)?\\s*(.+?)\\s*(?:a|es|en|=|:)\\s*(\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?(?:\\s*pesos)?)$/i);\n  if (m) {\n    productName = (m[1] || '').replace(/^[\\s\"']+|[\\s\"']+$/g, '').trim();\n    price = parseMoney(m[2]);\n  }\n} else if (lower.startsWith('eliminar') || lower.startsWith('borrar') || lower.startsWith('desactivar')) {\n  action = 'DELETE';\n  if (lower === 'eliminar todo' || lower === 'borrar todo') {\n    productName = ''; // Delete all\n  } else {\n    productName = rawMsg\n      .replace(/^(?:eliminar|borrar|desactivar)(?:\\s+producto)?\\s+/i, '')\n      .replace(/^[\\s\"']+|[\\s\"']+$/g, '')\n      .trim();\n  }\n}\n\n// 2. Fallback to LLM if natural language couldn't be parsed\nif (!action && rawOutput) {\n  try {\n    const jsonMatch = rawOutput.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      const parsed = JSON.parse(jsonMatch[0]);\n      action = parsed.action || 'LIST';\n      productName = (parsed.product_name || '').trim();\n      price = parseFloat(parsed.price || 0);\n      stock = parseInt(parsed.stock || 0, 10);\n      qtyChange = parsed.quantity_change || 0;\n    }\n  } catch(e) {}\n}\n\nif (!action) action = 'LIST';\n\nreturn {\n  action: action,\n  product_name: productName,\n  price: price,\n  stock: stock,\n  quantity_change: qtyChange,\n  wa_number: norm.wa_number,\n  tenant_id: norm.tenant_id,\n  tenant_name: norm.tenant_name,\n  whatsapp_phone_number_id: norm.whatsapp_phone_number_id,\n  whatsapp_access_token: norm.whatsapp_access_token\n};"
       },
       "id": "node-f2-parse-intent",
       "name": "Code - Parse CRUD Intent",
@@ -312,94 +312,14 @@
     },
     {
       "parameters": {
-        "operation": "update",
-        "tableId": "products",
-        "matchType": "allFilters",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "tenant_id",
-              "condition": "eq",
-              "keyValue": "={{ $json.tenant_id }}"
-            },
-            {
-              "keyName": "name",
-              "condition": "ilike",
-              "keyValue": "={{ $json.product_name }}"
-            }
-          ]
-        },
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "price",
-              "fieldValue": "={{ $json.price }}"
-            }
-          ]
-        }
-      },
-      "id": "node-f2-update-price",
-      "name": "Supabase - Update Product Price",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        140,
-        420
-      ],
-      "credentials": {
-        "supabaseApi": {
-          "id": "npXBeQbUWAELw9JL",
-          "name": "Supabase account"
-        }
-      },
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "tableId": "rpc/adjust_product_stock",
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "p_tenant_id",
-              "fieldValue": "={{ $json.tenant_id }}"
-            },
-            {
-              "fieldId": "p_product_name",
-              "fieldValue": "={{ $json.product_name }}"
-            },
-            {
-              "fieldId": "p_quantity_change",
-              "fieldValue": "={{ $json.quantity_change }}"
-            }
-          ]
-        }
-      },
-      "id": "node-f2-adjust-stock",
-      "name": "Supabase - Relative Stock Adjustment RPC",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        140,
-        660
-      ],
-      "credentials": {
-        "supabaseApi": {
-          "id": "npXBeQbUWAELw9JL",
-          "name": "Supabase account"
-        }
-      },
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "jsCode": "const ctx = $('Code - Parse CRUD Intent').item.json;\nconst rawDbOut = $input.all().map(i => i.json);\nconst dbOut = rawDbOut.filter(p => p && (p.id || p.name || p.success !== undefined || p.deleted_success !== undefined));\nlet message = '';\nlet buttons = [];\n\nswitch (ctx.action) {\n  case 'LIST': {\n    if (!dbOut || dbOut.length === 0) {\n      message = `📦 *INVENTARIO DE PRODUCTOS (0)*\\n` +\n        `🏢 *${ctx.tenant_name || 'Negocio'}*\\n\\n` +\n        `_No tienes productos activos registrados en tu catálogo actualmente._\\n\\n` +\n        `━━━━━━━━━━━━━━━━━━━━\\n` +\n        `✨ *¿CÓMO CREAR UN PRODUCTO?*\\n` +\n        `Escribe directamente un mensaje como:\\n` +\n        `👉 \\`crear producto Camisa Azul precio 120000 stock 25\\`\\n` +\n        `👉 \\`crear producto Zapatos por 250 mil con 10 unidades\\``;\n        \n      buttons = [\n        { id: \"tareas\", title: \"📋 Ver Tareas\" },\n        { id: \"reporte\", title: \"📊 Ver Reporte\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    } else if (dbOut.length === 1) {\n      const p = dbOut[0];\n      const stockStatus = p.stock === 0 ? ' ❌ *Agotado*' : (p.stock < 5 ? ' ⚠️ *Stock Bajo*' : ' ✅ *Disponible*');\n      \n      message = `📦 *INVENTARIO DE PRODUCTOS (1)*\\n` +\n        `🏢 *${ctx.tenant_name || 'Negocio'}*\\n\\n` +\n        `*1. ${p.name}*\\n` +\n        `   💰 *Precio:* $${parseFloat(p.price || 0).toLocaleString('es-CO')} COP\\n` +\n        `   📊 *Stock:* ${p.stock} unidades (${stockStatus})\\n\\n` +\n        `━━━━━━━━━━━━━━━━━━━━\\n` +\n        `👇 *Acciones rápidas 1-clic para este producto:*`;\n\n      buttons = [\n        { id: `agregar stock 5 a ${p.name}`, title: \"➕ +5 Stock\" },\n        { id: `restar stock 1 a ${p.name}`, title: \"➖ -1 Stock\" },\n        { id: `eliminar producto ${p.name}`, title: \"🗑️ Eliminar\" }\n      ];\n    } else {\n      const items = dbOut.map((p, idx) => {\n        const stockStatus = p.stock === 0 ? ' ❌ *Agotado*' : (p.stock < 5 ? ' ⚠️ *Stock Bajo*' : ' ✅ *Disponible*');\n        return `*${idx + 1}. ${p.name}*\\n` +\n               `   💰 *Precio:* $${parseFloat(p.price || 0).toLocaleString('es-CO')} COP\\n` +\n               `   📊 *Stock:* ${p.stock} unidades (${stockStatus})`;\n      }).join('\\n\\n');\n\n      const firstProd = dbOut[0].name;\n\n      message = `📦 *INVENTARIO DE PRODUCTOS (${dbOut.length})*\\n` +\n        `🏢 *${ctx.tenant_name || 'Negocio'}*\\n\\n` +\n        `${items}\\n\\n` +\n        `━━━━━━━━━━━━━━━━━━━━\\n` +\n        `💡 *ACCIONES RÁPIDAS:*\\n` +\n        `• ➕ *Sumar:* \\`agregar stock 10 a ${firstProd}\\`\\n` +\n        `• ➖ *Restar:* \\`restar stock 5 a ${firstProd}\\`\\n` +\n        `• 💲 *Precio:* \\`cambiar precio de ${firstProd} a 450000\\`\\n` +\n        `• 🗑️ *Eliminar:* \\`eliminar producto ${firstProd}\\`\\n` +\n        `• 🆕 *Crear:* \\`crear producto <nombre> precio <precio> stock <cant>\\``;\n\n      buttons = [\n        { id: `agregar stock 5 a ${firstProd}`, title: `➕ +5 a ${firstProd.slice(0, 10)}` },\n        { id: `eliminar producto ${firstProd}`, title: `🗑️ Borrar ${firstProd.slice(0, 8)}` },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    }\n    break;\n  }\n  case 'CREATE': {\n    const created = dbOut[0] || {};\n    const prodName = created.name || ctx.product_name;\n    message = `✅ *PRODUCTO CREADO EXITOSAMENTE*\\n\\n` +\n      `📦 *Nombre:* ${prodName}\\n` +\n      `💰 *Precio:* $${parseFloat(created.price || ctx.price || 0).toLocaleString('es-CO')} COP\\n` +\n      `📊 *Stock inicial:* ${created.stock !== undefined ? created.stock : ctx.stock} unidades\\n\\n` +\n      `💡 _Tus clientes ya pueden buscar y comprar este producto en tu tienda._`;\n      \n    buttons = [\n      { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n      { id: `agregar stock 10 a ${prodName}`, title: \"➕ Sumar +10 Stock\" },\n      { id: `eliminar producto ${prodName}`, title: \"🗑️ Eliminar\" }\n    ];\n    break;\n  }\n  case 'UPDATE_PRICE': {\n    if (!dbOut || dbOut.length === 0) {\n      message = `❌ *No se encontró el producto:* No pudimos encontrar un producto con el nombre *\"${ctx.product_name}\"* para actualizar su precio.\\n\\n💡 _Escribe_ \\`ver inventario\\` _para consultar los nombres exactos._`;\n      buttons = [\n        { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    } else {\n      message = `✅ *PRECIO ACTUALIZADO EXITOSAMENTE*\\n\\n` +\n        `📦 *Producto:* ${ctx.product_name}\\n` +\n        `💰 *Nuevo Precio:* $${ctx.price.toLocaleString('es-CO')} COP`;\n        \n      buttons = [\n        { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n        { id: `agregar stock 5 a ${ctx.product_name}`, title: \"➕ Ajustar Stock\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    }\n    break;\n  }\n  case 'DELETE': {\n    const filterRes = $('Code - Filter Products to Deactivate').all().map(i => i.json);\n    const validDeletions = filterRes.filter(p => p.deleted_success !== false && p.id);\n    \n    if (validDeletions.length === 0) {\n      message = `❌ *No se encontró el producto:* No encontramos ningún producto que coincida con *\"${ctx.product_name || 'el término solicitado'}\"* para retirar.\\n\\n💡 _Escribe_ \\`ver inventario\\` _para verificar los nombres exactos._`;\n    } else {\n      const names = validDeletions.map(p => p.name).join(', ');\n      message = `🗑️ *PRODUCTO ELIMINADO CON ÉXITO*\\n\\n` +\n        `Se ha desactivado y retirado de tu catálogo activo: *${names}*.`;\n    }\n    buttons = [\n      { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n      { id: \"tareas\", title: \"📋 Ver Tareas\" },\n      { id: \"menu\", title: \"🏠 Menú Principal\" }\n    ];\n    break;\n  }\n  case 'ADJUST_STOCK': {\n    const rpcRes = dbOut[0] || {};\n    const prodName = rpcRes.product_name || ctx.product_name;\n    if (rpcRes.success) {\n      const diff = ctx.quantity_change > 0 ? `+${ctx.quantity_change}` : `${ctx.quantity_change}`;\n      message = `📊 *STOCK ACTUALIZADO EXITOSAMENTE*\\n\\n` +\n        `📦 *Producto:* ${prodName}\\n` +\n        `🔄 *Ajuste aplicado:* ${diff} unidades\\n` +\n        `📈 *Nuevo Stock Total:* *${rpcRes.new_stock} unidades*`;\n        \n      buttons = [\n        { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n        { id: `agregar stock 5 a ${prodName}`, title: \"➕ +5 Más\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    } else {\n      message = `❌ *Error al ajustar stock:* ${rpcRes.error || 'No se encontró el producto o el stock resultante sería negativo.'}\\n\\n💡 _Verifica el nombre con_ \\`ver inventario\\`.`;\n      buttons = [\n        { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    }\n    break;\n  }\n  default:\n    message = `ℹ️ Acción de catálogo completada.`;\n    buttons = [\n      { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n      { id: \"menu\", title: \"🏠 Menú Principal\" }\n    ];\n}\n\nreturn {\n  wa_number: ctx.wa_number,\n  wa_message: message,\n  buttons: buttons,\n  phone_number_id: ctx.whatsapp_phone_number_id,\n  access_token: ctx.whatsapp_access_token\n};"
+        "jsCode": "const ctx = $('Code - Parse CRUD Intent').item.json;\nconst rawInput = $input.all().map(i => i.json);\nconst firstItem = rawInput[0] || {};\nlet message = '';\nlet buttons = [];\n\n// Handle Ambiguity (>1 products match the search term)\nif (firstItem.status === 'AMBIGUOUS') {\n  const matches = firstItem.matched_products || [];\n  const term = firstItem.search_term || ctx.product_name;\n  const qty = firstItem.quantity_change;\n  \n  let actionText = 'aplicar esta acción';\n  if (ctx.action === 'ADJUST_STOCK') {\n    actionText = qty > 0 ? `sumar +${qty} unidades de stock` : `restar ${Math.abs(qty)} unidades de stock`;\n  } else if (ctx.action === 'UPDATE_PRICE') {\n    actionText = `cambiar el precio a $${ctx.price.toLocaleString('es-CO')} COP`;\n  } else if (ctx.action === 'DELETE') {\n    actionText = 'eliminar';\n  }\n\n  const listItems = matches.map((p, i) => `*${i + 1}. ${p.name}* (Stock: ${p.stock} un | $${parseFloat(p.price || 0).toLocaleString('es-CO')})`).join('\\n');\n\n  message = `❓ *ENCONTRÉ ${matches.length} PRODUCTOS CON \"${term}\"*\\n\\n` +\n    `¿A cuál de ellos deseas ${actionText}?\\n\\n` +\n    `${listItems}\\n\\n` +\n    `👇 _Toca el botón correspondiente para confirmar la acción:_`;\n\n  buttons = matches.slice(0, 3).map((p, i) => {\n    let actionCommand = '';\n    if (ctx.action === 'ADJUST_STOCK') {\n      actionCommand = `agregar stock ${qty} a ${p.name}`;\n    } else if (ctx.action === 'UPDATE_PRICE') {\n      actionCommand = `cambiar precio de ${p.name} a ${ctx.price}`;\n    } else {\n      actionCommand = `eliminar producto ${p.name}`;\n    }\n    return {\n      id: actionCommand,\n      title: `${i + 1}. ${p.name.slice(0, 16)}`\n    };\n  });\n\n  return {\n    wa_number: ctx.wa_number,\n    wa_message: message,\n    buttons: buttons,\n    phone_number_id: ctx.whatsapp_phone_number_id,\n    access_token: ctx.whatsapp_access_token\n  };\n}\n\n// Handle Not Found\nif (firstItem.status === 'NOT_FOUND') {\n  const active = firstItem.active_products || [];\n  message = `❌ *No se encontró el producto: \"${ctx.product_name}\"*\\n\\n` +\n    `💡 Revisa los productos que tienes disponibles actualmente:\\n\\n` +\n    (active.length > 0 ? active.map((p, i) => `• *${p.name}* (Stock: ${p.stock})`).join('\\n') : '_No tienes productos activos._');\n\n  buttons = [\n    { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n    { id: \"menu\", title: \"🏠 Menú Principal\" }\n  ];\n\n  return {\n    wa_number: ctx.wa_number,\n    wa_message: message,\n    buttons: buttons,\n    phone_number_id: ctx.whatsapp_phone_number_id,\n    access_token: ctx.whatsapp_access_token\n  };\n}\n\n// Standard CRUD Formatter\nswitch (ctx.action) {\n  case 'LIST': {\n    const dbOut = rawInput.filter(p => p && p.id && p.name);\n    if (!dbOut || dbOut.length === 0) {\n      message = `📦 *INVENTARIO DE PRODUCTOS (0)*\\n` +\n        `🏢 *${ctx.tenant_name || 'Negocio'}*\\n\\n` +\n        `_No tienes productos activos registrados en tu catálogo actualmente._\\n\\n` +\n        `━━━━━━━━━━━━━━━━━━━━\\n` +\n        `✨ *¿CÓMO CREAR UN PRODUCTO?*\\n` +\n        `Escribe directamente un mensaje como:\\n` +\n        `👉 \\`crear producto Camisa Azul precio 120000 stock 25\\`\\n` +\n        `👉 \\`crear producto Zapatos por 250 mil con 10 unidades\\``;\n        \n      buttons = [\n        { id: \"tareas\", title: \"📋 Ver Tareas\" },\n        { id: \"reporte\", title: \"📊 Ver Reporte\" },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    } else if (dbOut.length === 1) {\n      const p = dbOut[0];\n      const stockStatus = p.stock === 0 ? ' ❌ *Agotado*' : (p.stock < 5 ? ' ⚠️ *Stock Bajo*' : ' ✅ *Disponible*');\n      \n      message = `📦 *INVENTARIO DE PRODUCTOS (1)*\\n` +\n        `🏢 *${ctx.tenant_name || 'Negocio'}*\\n\\n` +\n        `*1. ${p.name}*\\n` +\n        `   💰 *Precio:* $${parseFloat(p.price || 0).toLocaleString('es-CO')} COP\\n` +\n        `   📊 *Stock:* ${p.stock} unidades (${stockStatus})\\n\\n` +\n        `━━━━━━━━━━━━━━━━━━━━\\n` +\n        `👇 *Acciones rápidas 1-clic para este producto:*`;\n\n      buttons = [\n        { id: `agregar stock 5 a ${p.name}`, title: \"➕ +5 Stock\" },\n        { id: `restar stock 1 a ${p.name}`, title: \"➖ -1 Stock\" },\n        { id: `eliminar producto ${p.name}`, title: \"🗑️ Eliminar\" }\n      ];\n    } else {\n      const items = dbOut.map((p, idx) => {\n        const stockStatus = p.stock === 0 ? ' ❌ *Agotado*' : (p.stock < 5 ? ' ⚠️ *Stock Bajo*' : ' ✅ *Disponible*');\n        return `*${idx + 1}. ${p.name}*\\n` +\n               `   💰 *Precio:* $${parseFloat(p.price || 0).toLocaleString('es-CO')} COP\\n` +\n               `   📊 *Stock:* ${p.stock} unidades (${stockStatus})`;\n      }).join('\\n\\n');\n\n      const firstProd = dbOut[0].name;\n\n      message = `📦 *INVENTARIO DE PRODUCTOS (${dbOut.length})*\\n` +\n        `🏢 *${ctx.tenant_name || 'Negocio'}*\\n\\n` +\n        `${items}\\n\\n` +\n        `━━━━━━━━━━━━━━━━━━━━\\n` +\n        `💡 *ACCIONES RÁPIDAS:*\\n` +\n        `• ➕ *Sumar:* \\`agregar 10 de stock a ${firstProd}\\`\\n` +\n        `• ➖ *Restar:* \\`restar 5 de stock a ${firstProd}\\`\\n` +\n        `• 💲 *Precio:* \\`cambiar precio de ${firstProd} a 450000\\`\\n` +\n        `• 🗑️ *Eliminar:* \\`eliminar ${firstProd}\\`\\n` +\n        `• 🆕 *Crear:* \\`crear producto <nombre> precio <precio> stock <cant>\\``;\n\n      buttons = [\n        { id: `agregar stock 5 a ${firstProd}`, title: `➕ +5 a ${firstProd.slice(0, 10)}` },\n        { id: `eliminar producto ${firstProd}`, title: `🗑️ Borrar ${firstProd.slice(0, 8)}` },\n        { id: \"menu\", title: \"🏠 Menú Principal\" }\n      ];\n    }\n    break;\n  }\n  case 'CREATE': {\n    const created = rawInput[0] || {};\n    const prodName = created.name || ctx.product_name;\n    message = `✅ *PRODUCTO CREADO EXITOSAMENTE*\\n\\n` +\n      `📦 *Nombre:* ${prodName}\\n` +\n      `💰 *Precio:* $${parseFloat(created.price || ctx.price || 0).toLocaleString('es-CO')} COP\\n` +\n      `📊 *Stock inicial:* ${created.stock !== undefined ? created.stock : ctx.stock} unidades\\n\\n` +\n      `💡 _Tus clientes ya pueden buscar y comprar este producto en tu tienda._`;\n      \n    buttons = [\n      { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n      { id: `agregar stock 10 a ${prodName}`, title: \"➕ Sumar +10 Stock\" },\n      { id: `eliminar producto ${prodName}`, title: \"🗑️ Eliminar\" }\n    ];\n    break;\n  }\n  case 'UPDATE_PRICE': {\n    const updated = rawInput[0] || {};\n    message = `✅ *PRECIO ACTUALIZADO EXITOSAMENTE*\\n\\n` +\n      `📦 *Producto:* ${updated.name || ctx.product_name}\\n` +\n      `💰 *Nuevo Precio:* $${parseFloat(updated.new_price || ctx.price || 0).toLocaleString('es-CO')} COP`;\n      \n    buttons = [\n      { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n      { id: `agregar stock 5 a ${updated.name || ctx.product_name}`, title: \"➕ Ajustar Stock\" },\n      { id: \"menu\", title: \"🏠 Menú Principal\" }\n    ];\n    break;\n  }\n  case 'DELETE': {\n    const names = rawInput.filter(p => p.name).map(p => p.name).join(', ') || ctx.product_name;\n    message = `🗑️ *PRODUCTO ELIMINADO CON ÉXITO*\\n\\n` +\n      `Se ha retirado de tu catálogo activo: *${names}*.`;\n      \n    buttons = [\n      { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n      { id: \"tareas\", title: \"📋 Ver Tareas\" },\n      { id: \"menu\", title: \"🏠 Menú Principal\" }\n    ];\n    break;\n  }\n  case 'ADJUST_STOCK': {\n    const item = rawInput[0] || {};\n    const prodName = item.name || ctx.product_name;\n    const diff = ctx.quantity_change > 0 ? `+${ctx.quantity_change}` : `${ctx.quantity_change}`;\n    \n    message = `📊 *STOCK ACTUALIZADO EXITOSAMENTE*\\n\\n` +\n      `📦 *Producto:* ${prodName}\\n` +\n      `🔄 *Ajuste aplicado:* ${diff} unidades\\n` +\n      `📈 *Nuevo Stock Total:* *${item.new_stock} unidades*`;\n      \n    buttons = [\n      { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n      { id: `agregar stock 5 a ${prodName}`, title: \"➕ +5 Más\" },\n      { id: \"menu\", title: \"🏠 Menú Principal\" }\n    ];\n    break;\n  }\n  default:\n    message = `ℹ️ Acción de catálogo completada.`;\n    buttons = [\n      { id: \"ver inventario\", title: \"📦 Ver Inventario\" },\n      { id: \"menu\", title: \"🏠 Menú Principal\" }\n    ];\n}\n\nreturn {\n  wa_number: ctx.wa_number,\n  wa_message: message,\n  buttons: buttons,\n  phone_number_id: ctx.whatsapp_phone_number_id,\n  access_token: ctx.whatsapp_access_token\n};"
       },
       "id": "node-f2-format-response",
       "name": "Code - Format CRUD Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        560,
+        680,
         390
       ]
     },
@@ -431,7 +351,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        780,
+        900,
         390
       ]
     },
@@ -455,7 +375,7 @@
         }
       },
       "id": "node-f2-find-to-delete",
-      "name": "Supabase - Find Products to Delete",
+      "name": "Supabase - Get Active Products for Match",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -472,10 +392,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('Code - Parse CRUD Intent').item.json;\nconst rawProducts = $input.all().map(i => i.json).filter(p => p && p.id && p.name);\nconst target = (ctx.product_name || '').toLowerCase().trim();\n\nlet matched = [];\n\nif (!target || target === 'todo' || target === 'todos' || target === '%') {\n  // Delete all active products for tenant\n  matched = rawProducts;\n} else if (/^\\d+$/.test(target)) {\n  // Delete by 1-based index (e.g. \"eliminar 1\")\n  const idx = parseInt(target, 10) - 1;\n  if (rawProducts[idx]) matched = [rawProducts[idx]];\n} else {\n  // Match by exact or partial name\n  matched = rawProducts.filter(p => {\n    const pName = (p.name || '').toLowerCase();\n    return pName.includes(target) || target.includes(pName);\n  });\n}\n\nif (matched.length === 0) {\n  // If no match by partial, check if there's only 1 product total in database\n  if (rawProducts.length === 1 && (target.includes('camisa') || target.includes('crear') || target.includes('producto'))) {\n    matched = rawProducts;\n  }\n}\n\nif (matched.length === 0) {\n  return [{\n    json: {\n      deleted_success: false,\n      product_name: ctx.product_name,\n      deleted_items: []\n    }\n  }];\n}\n\nreturn matched.map(p => ({\n  json: {\n    id: p.id,\n    name: p.name,\n    is_active: \"false\",\n    deleted_success: true,\n    product_name: p.name\n  }\n}));"
+        "jsCode": "const ctx = $('Code - Parse CRUD Intent').item.json;\nconst rawProducts = $input.all().map(i => i.json).filter(p => p && p.id && p.name);\nconst target = (ctx.product_name || '').toLowerCase().trim();\n\nlet matched = [];\n\nif (ctx.action === 'DELETE' && (!target || target === 'todo' || target === 'todos' || target === '%')) {\n  // Delete all\n  matched = rawProducts;\n} else if (/^\\d+$/.test(target)) {\n  // Match by 1-based index (e.g. \"1\", \"2\")\n  const idx = parseInt(target, 10) - 1;\n  if (rawProducts[idx]) matched = [rawProducts[idx]];\n} else if (target) {\n  // Exact match first\n  matched = rawProducts.filter(p => p.name.toLowerCase() === target);\n  \n  // Partial substring match if no exact match\n  if (matched.length === 0) {\n    matched = rawProducts.filter(p => {\n      const pName = p.name.toLowerCase();\n      return pName.includes(target) || target.includes(pName);\n    });\n  }\n}\n\n// Case 1: Ambiguity detected (>1 matches) for non-delete-all operations\nif (matched.length > 1 && ctx.action !== 'DELETE') {\n  return [{\n    json: {\n      status: 'AMBIGUOUS',\n      action: ctx.action,\n      search_term: ctx.product_name,\n      matched_products: matched,\n      quantity_change: ctx.quantity_change,\n      new_price: ctx.price\n    }\n  }];\n}\n\n// Case 2: No match found\nif (matched.length === 0) {\n  return [{\n    json: {\n      status: 'NOT_FOUND',\n      action: ctx.action,\n      search_term: ctx.product_name,\n      active_products: rawProducts\n    }\n  }];\n}\n\n// Case 3: Exactly 1 match (or multi-delete) -> Prepare updates\nreturn matched.map(p => {\n  let newStock = p.stock;\n  let newPrice = p.price;\n  let isActive = p.is_active;\n\n  if (ctx.action === 'ADJUST_STOCK') {\n    newStock = Math.max(0, parseInt(p.stock, 10) + ctx.quantity_change);\n    isActive = newStock > 0 ? \"true\" : \"true\"; // Keep active\n  } else if (ctx.action === 'UPDATE_PRICE') {\n    newPrice = ctx.price;\n  } else if (ctx.action === 'DELETE') {\n    isActive = \"false\";\n    newStock = 0;\n  }\n\n  return {\n    json: {\n      status: 'SUCCESS',\n      id: p.id,\n      name: p.name,\n      old_stock: p.stock,\n      new_stock: newStock,\n      old_price: p.price,\n      new_price: newPrice,\n      is_active: isActive,\n      action: ctx.action,\n      quantity_change: ctx.quantity_change\n    }\n  };\n});"
       },
       "id": "node-f2-filter-deactivate",
-      "name": "Code - Filter Products to Deactivate",
+      "name": "Code - Resolve Product Match & Ambiguity",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -499,23 +419,27 @@
         "fieldsUi": {
           "fieldValues": [
             {
-              "fieldId": "is_active",
-              "fieldValue": "false"
+              "fieldId": "stock",
+              "fieldValue": "={{ $json.new_stock !== undefined ? $json.new_stock : $json.stock }}"
             },
             {
-              "fieldId": "stock",
-              "fieldValue": "0"
+              "fieldId": "price",
+              "fieldValue": "={{ $json.new_price !== undefined ? $json.new_price : $json.price }}"
+            },
+            {
+              "fieldId": "is_active",
+              "fieldValue": "={{ $json.is_active !== undefined ? $json.is_active : 'true' }}"
             }
           ]
         }
       },
       "id": "node-f2-deactivate-by-id",
-      "name": "Supabase - Deactivate Products by ID",
+      "name": "Supabase - Apply Product Updates by ID",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        360,
-        540
+        460,
+        480
       ],
       "credentials": {
         "supabaseApi": {
@@ -524,6 +448,39 @@
         }
       },
       "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "SUCCESS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-f2-if-ready-updates",
+      "name": "IF - Ready to Apply DB Updates?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        260,
+        540
+      ]
     }
   ],
   "pinData": {},
@@ -623,7 +580,7 @@
         ],
         [
           {
-            "node": "Supabase - Update Product Price",
+            "node": "Supabase - Find Products to Delete",
             "type": "main",
             "index": 0
           }
@@ -637,7 +594,7 @@
         ],
         [
           {
-            "node": "Supabase - Relative Stock Adjustment RPC",
+            "node": "Supabase - Find Products to Delete",
             "type": "main",
             "index": 0
           }
@@ -723,6 +680,57 @@
     },
     "Supabase - Deactivate Products by ID": {
       "main": [
+        [
+          {
+            "node": "Code - Format CRUD Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Get Active Products for Match": {
+      "main": [
+        [
+          {
+            "node": "Code - Resolve Product Match & Ambiguity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Resolve Product Match & Ambiguity": {
+      "main": [
+        [
+          {
+            "node": "IF - Ready to Apply DB Updates?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Apply Product Updates by ID": {
+      "main": [
+        [
+          {
+            "node": "Code - Format CRUD Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Ready to Apply DB Updates?": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Apply Product Updates by ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Code - Format CRUD Response",
