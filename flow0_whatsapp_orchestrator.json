@@ -403,7 +403,11 @@
     },
     {
       "parameters": {
-        "workflowId": "flow1_sales_state_machine",
+        "workflowId": {
+          "__rl": true,
+          "value": "flow1_sales_state_machine",
+          "mode": "id"
+        },
         "options": {}
       },
       "id": "66ae5cb9-b30e-425b-83fa-21814b1baaf1",
@@ -417,7 +421,11 @@
     },
     {
       "parameters": {
-        "workflowId": "flow2_product_catalog_crud",
+        "workflowId": {
+          "__rl": true,
+          "value": "flow2_product_catalog_crud",
+          "mode": "id"
+        },
         "options": {}
       },
       "id": "45b3783d-6ba4-46d5-9e29-7f48d4c4907d",
@@ -431,7 +439,11 @@
     },
     {
       "parameters": {
-        "workflowId": "flow3_automated_reports",
+        "workflowId": {
+          "__rl": true,
+          "value": "flow3_automated_reports",
+          "mode": "id"
+        },
         "options": {}
       },
       "id": "114c928d-adfa-40eb-858a-3df15f0778db",
@@ -445,7 +457,11 @@
     },
     {
       "parameters": {
-        "workflowId": "flow4_appointment_booking",
+        "workflowId": {
+          "__rl": true,
+          "value": "flow4_appointment_booking",
+          "mode": "id"
+        },
         "options": {}
       },
       "id": "88b3fe9a-2d04-415d-a953-ac2c94419cc5",
