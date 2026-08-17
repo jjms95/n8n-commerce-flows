@@ -88,7 +88,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const norm = $('Code - Normalize Inbound CRUD Request').item.json;\nconst rawOutput = $input.item.json.output || $input.item.json.text || '';\nconst rawMsg = (norm.original_message || '').trim();\nconst lower = rawMsg.toLowerCase();\n\nlet action = '';\nlet productName = '';\nlet price = 0;\nlet stock = 0;\nlet qtyChange = 0;\n\n// Helper to parse numbers like \"500 mil\", \"500000\", \"50k\", \"1.5 millones\", \"$500.000\"\nfunction parseMoney(str) {\n  if (!str) return 0;\n  let s = str.toLowerCase().replace(/[$ pesos]/g, '').trim();\n  if (s.includes('millon') || s.includes('millones')) {\n    const num = parseFloat(s.replace(/millon(es)?/g, '').trim());\n    return num * 1000000;\n  }\n  if (s.includes('mil') || s.includes('k')) {\n    const num = parseFloat(s.replace(/(mil|k)/g, '').trim());\n    return num * 1000;\n  }\n  if (/^\\d{1,3}(\\.\\d{3})+$/.test(s)) {\n    s = s.replace(/\\./g, '');\n  }\n  return parseFloat(s) || 0;\n}\n\n// 1. FAST REGEX & NATURAL LANGUAGE PARSER\nif (lower === 'ver inventario' || lower === 'inventario' || lower === 'catalogo' || lower === 'catálogo' || lower === 'ver productos' || lower === 'listar' || lower === 'productos') {\n  action = 'LIST';\n} else if (lower.startsWith('crear producto') || lower.startsWith('agregar producto') || lower.startsWith('nuevo producto')) {\n  action = 'CREATE';\n  \n  // Extract Stock: e.g. \"stock de 30\", \"stock 30\", \"30 unidades\", \"con 30 unidades\"\n  const stockMatch = rawMsg.match(/(?:un\\s+)?stock\\s+(?:de\\s+|en\\s+)?(\\d+)|(?:con\\s+)?(\\d+)\\s+unidades/i);\n  if (stockMatch) {\n    stock = parseInt(stockMatch[1] || stockMatch[2], 10);\n  }\n  \n  // Extract Price: e.g. \"precio de 500 mil pesos\", \"precio 50000\", \"valor 120k\", \"por 120.000\"\n  const priceMatch = rawMsg.match(/(?:con\\s+)?(?:precio|valor)\\s+(?:de\\s+|en\\s+)?(\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?(?:\\s+pesos)?)|(?:por\\s+(\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?))/i);\n  if (priceMatch) {\n    price = parseMoney(priceMatch[1] || priceMatch[2]);\n  }\n  \n  // Clean product name\n  let namePart = rawMsg\n    .replace(/^(?:crear|agregar|nuevo)\\s+producto\\s+/i, '')\n    .replace(/,?\\s*(?:con\\s+)?(?:precio|valor)\\s+(?:de\\s+|en\\s+)?\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?(?:\\s+pesos)?/gi, '')\n    .replace(/,?\\s*(?:y\\s+)?(?:un\\s+)?stock\\s+(?:de\\s+|en\\s+)?\\d+(?:\\s+unidades)?/gi, '')\n    .replace(/,?\\s*(?:con\\s+)?\\d+\\s+unidades/gi, '')\n    .replace(/,?\\s*por\\s+\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?/gi, '')\n    .replace(/^[\\s,;:\"'-]+|[\\s,;:\"'-]+$/g, '')\n    .trim();\n    \n  productName = namePart || 'Producto Nuevo';\n  productName = productName.charAt(0).toUpperCase() + productName.slice(1);\n  \n} else if (lower.startsWith('agregar stock') || lower.startsWith('sumar stock') || lower.startsWith('añadir stock')) {\n  action = 'ADJUST_STOCK';\n  const m = rawMsg.match(/(?:agregar|sumar|añadir)\\s+stock\\s+(?:de\\s+)?(\\d+)\\s+(?:a|al|para)\\s+(.+)$/i);\n  if (m) {\n    qtyChange = parseInt(m[1], 10);\n    productName = m[2].replace(/^[\\s\"']+|[\\s\"']+$/g, '').trim();\n  }\n} else if (lower.startsWith('restar stock') || lower.startsWith('quitar stock') || lower.startsWith('reducir stock') || lower.startsWith('descontar stock')) {\n  action = 'ADJUST_STOCK';\n  const m = rawMsg.match(/(?:restar|quitar|reducir|descontar)\\s+stock\\s+(?:de\\s+)?(\\d+)\\s+(?:a|al|de|del)\\s+(.+)$/i);\n  if (m) {\n    qtyChange = -Math.abs(parseInt(m[1], 10));\n    productName = m[2].replace(/^[\\s\"']+|[\\s\"']+$/g, '').trim();\n  }\n} else if (lower.startsWith('cambiar precio') || lower.startsWith('actualizar precio')) {\n  action = 'UPDATE_PRICE';\n  const m = rawMsg.match(/(?:cambiar|actualizar)\\s+precio\\s+de\\s+(.+?)\\s+a\\s+(\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?(?:\\s+pesos)?)$/i);\n  if (m) {\n    productName = m[1].replace(/^[\\s\"']+|[\\s\"']+$/g, '').trim();\n    price = parseMoney(m[2]);\n  }\n} else if (lower.startsWith('eliminar producto') || lower.startsWith('borrar producto') || lower.startsWith('desactivar producto') || lower.startsWith('eliminar ') || lower.startsWith('borrar ') || lower.startsWith('desactivar ')) {\n  action = 'DELETE';\n  productName = rawMsg\n    .replace(/^(?:eliminar|borrar|desactivar)(?:\\s+producto)?\\s+/i, '')\n    .replace(/^[\\s\"']+|[\\s\"']+$/g, '')\n    .trim();\n}\n\n// 2. Fallback to LLM if natural language couldn't be parsed\nif (!action && rawOutput) {\n  try {\n    const jsonMatch = rawOutput.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      const parsed = JSON.parse(jsonMatch[0]);\n      action = parsed.action || 'LIST';\n      productName = (parsed.product_name || '').trim();\n      price = parseFloat(parsed.price || 0);\n      stock = parseInt(parsed.stock || 0, 10);\n      qtyChange = parsed.quantity_change || 0;\n    }\n  } catch(e) {}\n}\n\nif (!action) action = 'LIST';\n\nreturn {\n  action: action,\n  product_name: productName,\n  price: price,\n  stock: stock,\n  quantity_change: qtyChange,\n  wa_number: norm.wa_number,\n  tenant_id: norm.tenant_id,\n  tenant_name: norm.tenant_name,\n  whatsapp_phone_number_id: norm.whatsapp_phone_number_id,\n  whatsapp_access_token: norm.whatsapp_access_token\n};"
+        "jsCode": "const norm = $('Code - Normalize Inbound CRUD Request').item.json;\nconst rawOutput = $input.item.json.output || $input.item.json.text || '';\nconst rawMsg = (norm.original_message || '').trim();\nconst lower = rawMsg.toLowerCase();\n\nlet action = '';\nlet productName = '';\nlet price = 0;\nlet stock = 0;\nlet qtyChange = 0;\n\n// Helper to parse numbers like \"500 mil\", \"500000\", \"50k\", \"1.5 millones\", \"$500.000\"\nfunction parseMoney(str) {\n  if (!str) return 0;\n  let s = str.toLowerCase().replace(/[$ pesos]/g, '').trim();\n  if (s.includes('millon') || s.includes('millones')) {\n    const num = parseFloat(s.replace(/millon(es)?/g, '').trim());\n    return num * 1000000;\n  }\n  if (s.includes('mil') || s.includes('k')) {\n    const num = parseFloat(s.replace(/(mil|k)/g, '').trim());\n    return num * 1000;\n  }\n  if (/^\\d{1,3}(\\.\\d{3})+$/.test(s)) {\n    s = s.replace(/\\./g, '');\n  }\n  return parseFloat(s) || 0;\n}\n\n// 1. FAST REGEX & NATURAL LANGUAGE PARSER\nif (lower === 'ver inventario' || lower === 'inventario' || lower === 'catalogo' || lower === 'catálogo' || lower === 'ver productos' || lower === 'listar' || lower === 'productos') {\n  action = 'LIST';\n} else if (lower.startsWith('crear producto') || lower.startsWith('agregar producto') || lower.startsWith('nuevo producto')) {\n  action = 'CREATE';\n  \n  // Extract Stock: e.g. \"stock de 30\", \"stock 30\", \"30 unidades\", \"con 30 unidades\"\n  const stockMatch = rawMsg.match(/(?:un\\s+)?stock\\s+(?:de\\s+|en\\s+)?(\\d+)|(?:con\\s+)?(\\d+)\\s+unidades/i);\n  if (stockMatch) {\n    stock = parseInt(stockMatch[1] || stockMatch[2], 10);\n  }\n  \n  // Extract Price: e.g. \"precio de 500 mil pesos\", \"precio 50000\", \"valor 120k\", \"por 120.000\"\n  const priceMatch = rawMsg.match(/(?:con\\s+)?(?:precio|valor)\\s+(?:de\\s+|en\\s+)?(\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?(?:\\s+pesos)?)|(?:por\\s+(\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?))/i);\n  if (priceMatch) {\n    price = parseMoney(priceMatch[1] || priceMatch[2]);\n  }\n  \n  // Clean product name\n  let namePart = rawMsg\n    .replace(/^(?:crear|agregar|nuevo)\\s+producto\\s+/i, '')\n    .replace(/,?\\s*(?:con\\s+)?(?:precio|valor)\\s+(?:de\\s+|en\\s+)?\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?(?:\\s+pesos)?/gi, '')\n    .replace(/,?\\s*(?:y\\s+)?(?:un\\s+)?stock\\s+(?:de\\s+|en\\s+)?\\d+(?:\\s+unidades)?/gi, '')\n    .replace(/,?\\s*(?:con\\s+)?\\d+\\s+unidades/gi, '')\n    .replace(/,?\\s*por\\s+\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?/gi, '')\n    .replace(/^[\\s,;:\"'-]+|[\\s,;:\"'-]+$/g, '')\n    .trim();\n    \n  productName = namePart || 'Producto Nuevo';\n  productName = productName.charAt(0).toUpperCase() + productName.slice(1);\n  \n} else if (lower.startsWith('agregar stock') || lower.startsWith('sumar stock') || lower.startsWith('añadir stock')) {\n  action = 'ADJUST_STOCK';\n  const m = rawMsg.match(/(?:agregar|sumar|añadir)\\s+stock\\s+(?:de\\s+)?(\\d+)\\s+(?:a|al|para)\\s+(.+)$/i);\n  if (m) {\n    qtyChange = parseInt(m[1], 10);\n    productName = m[2].replace(/^[\\s\"']+|[\\s\"']+$/g, '').trim();\n  }\n} else if (lower.startsWith('restar stock') || lower.startsWith('quitar stock') || lower.startsWith('reducir stock') || lower.startsWith('descontar stock')) {\n  action = 'ADJUST_STOCK';\n  const m = rawMsg.match(/(?:restar|quitar|reducir|descontar)\\s+stock\\s+(?:de\\s+)?(\\d+)\\s+(?:a|al|de|del)\\s+(.+)$/i);\n  if (m) {\n    qtyChange = -Math.abs(parseInt(m[1], 10));\n    productName = m[2].replace(/^[\\s\"']+|[\\s\"']+$/g, '').trim();\n  }\n} else if (lower.startsWith('cambiar precio') || lower.startsWith('actualizar precio')) {\n  action = 'UPDATE_PRICE';\n  const m = rawMsg.match(/(?:cambiar|actualizar)\\s+precio\\s+de\\s+(.+?)\\s+a\\s+(\\d+(?:[.,]\\d+)?\\s*(?:mil|k|millones|millon)?(?:\\s+pesos)?)$/i);\n  if (m) {\n    productName = m[1].replace(/^[\\s\"']+|[\\s\"']+$/g, '').trim();\n    price = parseMoney(m[2]);\n  }\n} else if (lower.startsWith('eliminar producto') || lower.startsWith('borrar producto') || lower.startsWith('desactivar producto') || lower.startsWith('eliminar ') || lower.startsWith('borrar ') || lower.startsWith('desactivar ') || lower === 'eliminar todo' || lower === 'borrar todo') {\n  action = 'DELETE';\n  if (lower === 'eliminar todo' || lower === 'borrar todo') {\n    productName = ''; // Delete all\n  } else {\n    productName = rawMsg\n      .replace(/^(?:eliminar|borrar|desactivar)(?:\\s+producto)?\\s+/i, '')\n      .replace(/^[\\s\"']+|[\\s\"']+$/g, '')\n      .trim();\n  }\n}\n\n// 2. Fallback to LLM if natural language couldn't be parsed\nif (!action && rawOutput) {\n  try {\n    const jsonMatch = rawOutput.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      const parsed = JSON.parse(jsonMatch[0]);\n      action = parsed.action || 'LIST';\n      productName = (parsed.product_name || '').trim();\n      price = parseFloat(parsed.price || 0);\n      stock = parseInt(parsed.stock || 0, 10);\n      qtyChange = parsed.quantity_change || 0;\n    }\n  } catch(e) {}\n}\n\nif (!action) action = 'LIST';\n\nreturn {\n  action: action,\n  product_name: productName,\n  price: price,\n  stock: stock,\n  quantity_change: qtyChange,\n  wa_number: norm.wa_number,\n  tenant_id: norm.tenant_id,\n  tenant_name: norm.tenant_name,\n  whatsapp_phone_number_id: norm.whatsapp_phone_number_id,\n  whatsapp_access_token: norm.whatsapp_access_token\n};"
       },
       "id": "node-f2-parse-intent",
       "name": "Code - Parse CRUD Intent",
@@ -356,7 +356,7 @@
     },
     {
       "parameters": {
-        "operation": "update",
+        "operation": "delete",
         "tableId": "products",
         "matchType": "allFilters",
         "filters": {
@@ -369,21 +369,13 @@
             {
               "keyName": "name",
               "condition": "ilike",
-              "keyValue": "={{ $json.product_name }}"
-            }
-          ]
-        },
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "is_active",
-              "fieldValue": "={{ false }}"
+              "keyValue": "={{ $json.product_name ? $json.product_name : \"%\" }}"
             }
           ]
         }
       },
       "id": "node-f2-delete-product",
-      "name": "Supabase - Deactivate Product",
+      "name": "Supabase - Delete Product",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
@@ -584,7 +576,7 @@
         ],
         [
           {
-            "node": "Supabase - Deactivate Product",
+            "node": "Supabase - Delete Product",
             "type": "main",
             "index": 0
           }
@@ -631,17 +623,6 @@
         ]
       ]
     },
-    "Supabase - Deactivate Product": {
-      "main": [
-        [
-          {
-            "node": "Code - Format CRUD Response",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Supabase - Relative Stock Adjustment RPC": {
       "main": [
         [
@@ -658,6 +639,17 @@
         [
           {
             "node": "HTTP - Send Admin WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Delete Product": {
+      "main": [
+        [
+          {
+            "node": "Code - Format CRUD Response",
             "type": "main",
             "index": 0
           }
