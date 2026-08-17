@@ -580,21 +580,21 @@
         ],
         [
           {
-            "node": "Supabase - Find Products to Delete",
+            "node": "Supabase - Get Active Products for Match",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Supabase - Find Products to Delete",
+            "node": "Supabase - Get Active Products for Match",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Supabase - Find Products to Delete",
+            "node": "Supabase - Get Active Products for Match",
             "type": "main",
             "index": 0
           }
@@ -613,72 +613,6 @@
       ]
     },
     "Supabase - Create Product": {
-      "main": [
-        [
-          {
-            "node": "Code - Format CRUD Response",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Supabase - Update Product Price": {
-      "main": [
-        [
-          {
-            "node": "Code - Format CRUD Response",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Supabase - Relative Stock Adjustment RPC": {
-      "main": [
-        [
-          {
-            "node": "Code - Format CRUD Response",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code - Format CRUD Response": {
-      "main": [
-        [
-          {
-            "node": "HTTP - Send Admin WhatsApp Response",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Supabase - Find Products to Delete": {
-      "main": [
-        [
-          {
-            "node": "Code - Filter Products to Deactivate",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code - Filter Products to Deactivate": {
-      "main": [
-        [
-          {
-            "node": "Supabase - Deactivate Products by ID",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Supabase - Deactivate Products by ID": {
       "main": [
         [
           {
@@ -711,17 +645,6 @@
         ]
       ]
     },
-    "Supabase - Apply Product Updates by ID": {
-      "main": [
-        [
-          {
-            "node": "Code - Format CRUD Response",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "IF - Ready to Apply DB Updates?": {
       "main": [
         [
@@ -734,6 +657,28 @@
         [
           {
             "node": "Code - Format CRUD Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Apply Product Updates by ID": {
+      "main": [
+        [
+          {
+            "node": "Code - Format CRUD Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Format CRUD Response": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Send Admin WhatsApp Response",
             "type": "main",
             "index": 0
           }
