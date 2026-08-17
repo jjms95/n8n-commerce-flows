@@ -325,7 +325,7 @@
             {
               "keyName": "name",
               "condition": "ilike",
-              "keyValue": "={{ '%' + $json.product_name + '%' }}"
+              "keyValue": "={{ $json.product_name }}"
             }
           ]
         },
@@ -369,7 +369,7 @@
             {
               "keyName": "name",
               "condition": "ilike",
-              "keyValue": "={{ '%' + $json.product_name + '%' }}"
+              "keyValue": "={{ $json.product_name }}"
             }
           ]
         },
@@ -377,7 +377,7 @@
           "fieldValues": [
             {
               "fieldId": "is_active",
-              "fieldValue": "false"
+              "fieldValue": "={{ false }}"
             }
           ]
         }
