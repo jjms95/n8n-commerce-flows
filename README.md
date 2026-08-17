@@ -61,12 +61,12 @@ export WEBHOOK_URL="https://tu-subdominio.ngrok-free.dev" && npx n8n start
 3. Inserta tu negocio y credenciales de Meta siguiendo la [Guía de Queries de Prueba](docs/queries_pruebas.md#1-creación-de-negocios-de-prueba-tenants).
 
 ### 4. Importar y Conectar Credenciales en N8N
-Abre `http://localhost:5678`, crea tus credenciales globales de **Supabase API** (`service_role`) y **OpenAI API** (OpenRouter) e importa los 5 flujos JSON.
+Abre `http://localhost:5678`, crea tus credenciales globales de **Supabase API** (`service_role`) y **NVIDIA Nemotron API** (`nvidiaApi`) e importa los 5 flujos JSON.
 
 > ⚠️ **Checklist de Datos Reales Antes de Probar:**  
 > Consulta la [Guía de Checklist de Parámetros Reales](docs/despliegue_produccion.md#-checklist-de-parámetros-reales-antes-de-probar) para verificar los 4 puntos clave antes de tus pruebas:
 > 1. Configurar tus tokens de Meta (`whatsapp_phone_number_id`, `whatsapp_access_token`, `whatsapp_verify_token`) y tu número en la tabla `public.tenants`.
-> 2. Crear las credenciales de Supabase (`service_role`) y OpenRouter (`openAiApi`) en n8n.
+> 2. Crear las credenciales de Supabase (`service_role`) y NVIDIA Nemotron (`nvidiaApi`) en n8n.
 > 3. Reemplazar el placeholder `YOUR_PROJECT_ID` en `flujo1_ventas_estados.json` por tu ID de Supabase.
 > 4. Configurar el Webhook de Meta apuntando a tu URL de n8n.
 

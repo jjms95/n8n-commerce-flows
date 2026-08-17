@@ -203,9 +203,9 @@ En el panel de N8N (`Settings > Credentials`), añade las siguientes dos credenc
 - **Service Role Secret**: Tu clave `service_role` de Supabase (**Project Settings > API > service_role key**).
   > ⚠️ **Importante**: Usa la clave `service_role`, no la clave `anon`, ya que los flujos requieren permisos administrativos y acceso a las RPCs protegidas por RLS.
 
-### 2. OpenAI / OpenRouter API (`openAiApi`)
-- **API Key**: `sk-or-v1-...` (Tu clave de OpenRouter)
-- **Base URL**: `https://openrouter.ai/api/v1`
+### 2. NVIDIA Nemotron API (`nvidiaApi`)
+- **API Key**: Tu clave de API de NVIDIA (`nvapi-...`).
+- **Modelo**: NVIDIA Nemotron Chat Model configurado en el agente LangChain (o cualquier proveedor de LLM compatible en n8n).
 
 ---
 

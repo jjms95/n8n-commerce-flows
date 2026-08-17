@@ -38,34 +38,38 @@
     },
     {
       "parameters": {
-        "model": {
-          "__rl": true,
-          "value": "openai/gpt-4o-mini",
-          "mode": "id"
-        },
-        "options": {
-          "temperature": 0.1,
-          "maxTokens": 500
-        }
+        "options": {}
       },
-      "id": "node-f2-lm-openrouter",
-      "name": "LM - OpenRouter (CRUD)",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "type": "@n8n/n8n-nodes-langchain.lmChatNvidia",
       "typeVersion": 1,
       "position": [
         -560,
         560
       ],
+      "id": "node-f2-lm-nvidia",
+      "name": "NVIDIA Nemotron Chat Model",
       "credentials": {
-        "openAiApi": {
-          "id": "OPENROUTER_CREDENTIAL_ID",
-          "name": "OpenRouter via OpenAI compat"
+        "nvidiaApi": {
+          "id": "4uG5dgHoN9C5jr99",
+          "name": "NVIDIA Nemotron account"
         }
       }
     },
     {
       "parameters": {
-        "agent": "conversationalAgent",
+        "sessionIdType": "customKey"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        -420,
+        560
+      ],
+      "id": "node-f2-memory",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
         "promptType": "define",
         "text": "=Analiza la intención de gestión de catálogo de productos del negocio a partir del mensaje:\n\nMensaje: \"{{ $json.original_message }}\"\n\nDetermina la acción:\n- LIST: ver inventario, ver productos, catálogo, listar\n- CREATE: crear producto, agregar producto nuevo\n- UPDATE_PRICE: cambiar precio, actualizar precio\n- DELETE: eliminar producto, desactivar producto, borrar\n- ADJUST_STOCK: agregar stock, restar stock, sumar stock, reducir stock, modificar stock\n\nResponde ÚNICAMENTE en JSON plano:\n{\n  \"action\": \"LIST\" | \"CREATE\" | \"UPDATE_PRICE\" | \"DELETE\" | \"ADJUST_STOCK\",\n  \"product_name\": \"nombre del producto o término\",\n  \"price\": 100,\n  \"stock\": 10,\n  \"quantity_change\": 5\n}",
         "options": {
@@ -75,7 +79,7 @@
       "id": "node-f2-ai-agent",
       "name": "AI Agent - Catálogo CRUD",
       "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 1.7,
+      "typeVersion": 3.1,
       "position": [
         -560,
         390
@@ -241,7 +245,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -285,7 +289,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -317,7 +321,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -349,7 +353,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -385,7 +389,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -470,12 +474,23 @@
         ]
       ]
     },
-    "LM - OpenRouter (CRUD)": {
+    "NVIDIA Nemotron Chat Model": {
       "ai_languageModel": [
         [
           {
             "node": "AI Agent - Catálogo CRUD",
             "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent - Catálogo CRUD",
+            "type": "ai_memory",
             "index": 0
           }
         ]

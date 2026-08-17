@@ -31,7 +31,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -157,7 +157,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -215,7 +215,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -412,7 +412,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -528,7 +528,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -549,28 +549,20 @@
     },
     {
       "parameters": {
-        "model": {
-          "__rl": true,
-          "value": "openai/gpt-4o-mini",
-          "mode": "id"
-        },
-        "options": {
-          "temperature": 0.1,
-          "maxTokens": 400
-        }
+        "options": {}
       },
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "type": "@n8n/n8n-nodes-langchain.lmChatNvidia",
       "typeVersion": 1,
       "position": [
         -12720,
         6288
       ],
       "id": "05b71e78-37b4-4a99-b56c-0e266917b75f",
-      "name": "LM - OpenRouter (Ventas)",
+      "name": "NVIDIA Nemotron Chat Model",
       "credentials": {
-        "openAiApi": {
-          "id": "OPENROUTER_CREDENTIAL_ID",
-          "name": "OpenRouter via OpenAI compat"
+        "nvidiaApi": {
+          "id": "4uG5dgHoN9C5jr99",
+          "name": "NVIDIA Nemotron account"
         }
       }
     },
@@ -655,7 +647,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -735,7 +727,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -826,7 +818,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -913,7 +905,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -996,7 +988,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -1104,7 +1096,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -1132,7 +1124,7 @@
       "alwaysOutputData": true,
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -1231,7 +1223,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -1494,7 +1486,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -1576,7 +1568,7 @@
       "alwaysOutputData": true,
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -1621,7 +1613,7 @@
       "alwaysOutputData": true,
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -1698,7 +1690,7 @@
       "alwaysOutputData": true,
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -1760,7 +1752,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -1801,7 +1793,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -1899,7 +1891,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "w3SOCCrBlarr2lvz",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }

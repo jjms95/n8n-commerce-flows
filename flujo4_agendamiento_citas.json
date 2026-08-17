@@ -32,44 +32,48 @@
     },
     {
       "parameters": {
-        "model": {
-          "__rl": true,
-          "value": "openai/gpt-4o-mini",
-          "mode": "id"
-        },
-        "options": {
-          "temperature": 0.1,
-          "maxTokens": 600
-        }
+        "options": {}
       },
-      "id": "lm-openrouter-appointments",
-      "name": "LM - OpenRouter (Citas)",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "type": "@n8n/n8n-nodes-langchain.lmChatNvidia",
       "typeVersion": 1,
       "position": [
         460,
         500
       ],
+      "id": "lm-nvidia-appointments",
+      "name": "NVIDIA Nemotron Chat Model",
       "credentials": {
-        "openAiApi": {
-          "id": "OPENROUTER_CREDENTIAL_ID",
-          "name": "OpenRouter via OpenAI compat"
+        "nvidiaApi": {
+          "id": "4uG5dgHoN9C5jr99",
+          "name": "NVIDIA Nemotron account"
         }
       }
     },
     {
       "parameters": {
-        "agent": "conversationalAgent",
+        "sessionIdType": "customKey"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        580,
+        500
+      ],
+      "id": "memory-appointments",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
         "promptType": "define",
-        "text": "=Analiza el siguiente mensaje y extrae los datos de la cita.\n\nMensaje: \"{{ $json.message }}\"\nTipo de remitente: {{ $json.sender_type }}\nFecha y hora actual ISO: {{ $now.toISO() }}\n\nExtrae:\n- created_by: 'client' o 'business'\n- title: asunto o motivo de la cita\n- appointment_date: fecha y hora en formato ISO 8601 (YYYY-MM-DDTHH:MM:SS). A\u00f1o actual si no se especifica. Fecha futura m\u00e1s pr\u00f3xima.\n- status: siempre 'scheduled'\n- is_valid: true si se pudo extraer fecha v\u00e1lida, false si no\n\nResponde SOLO con JSON:\n{\"created_by\": \"client\", \"title\": \"...\", \"appointment_date\": \"2025-08-10T15:00:00\", \"status\": \"scheduled\", \"is_valid\": true}",
+        "text": "=Analiza el siguiente mensaje y extrae los datos de la cita.\n\nMensaje: \"{{ $json.message }}\"\nTipo de remitente: {{ $json.sender_type }}\nFecha y hora actual ISO: {{ $now.toISO() }}\n\nExtrae:\n- created_by: 'client' o 'business'\n- title: asunto o motivo de la cita\n- appointment_date: fecha y hora en formato ISO 8601 (YYYY-MM-DDTHH:MM:SS). Año actual si no se especifica. Fecha futura más próxima.\n- status: siempre 'scheduled'\n- is_valid: true si se pudo extraer fecha válida, false si no\n\nResponde SOLO con JSON:\n{\"created_by\": \"client\", \"title\": \"...\", \"appointment_date\": \"2025-08-10T15:00:00\", \"status\": \"scheduled\", \"is_valid\": true}",
         "options": {
-          "systemMessage": "Eres un extractor de datos para agendamiento de citas. Responde \u00fanicamente con JSON v\u00e1lido."
+          "systemMessage": "Eres un extractor de datos para agendamiento de citas. Responde únicamente con JSON válido."
         }
       },
       "id": "ai-agent-appointments",
       "name": "AI Agent - Extraer Datos de Cita",
       "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 1.6,
+      "typeVersion": 3.1,
       "position": [
         460,
         300
@@ -144,7 +148,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "SUPABASE_CREDENTIAL_ID",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -202,7 +206,7 @@
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "SUPABASE_CREDENTIAL_ID",
+          "id": "npXBeQbUWAELw9JL",
           "name": "Supabase account"
         }
       }
@@ -353,7 +357,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = .item.json;\nconst tenant = item.tenant || {};\nconst sender = item.sender || {};\nconst msg = item.message || {};\n\nconst text = msg.text || item.original_message || item.message || ;\nconst number = sender.number || tenant.number || item.number || ;\nconst senderType = sender.type || item.sender_type || client;\n\nreturn {\n  message: text,\n  number: number,\n  sender_type: senderType,\n  tenant: tenant,\n  sender: sender\n};"
+        "jsCode": "const item = $input.item.json;\nconst tenant = item.tenant || {};\nconst sender = item.sender || {};\nconst msg = item.message || {};\n\nconst text = msg.text || item.original_message || item.message || '';\nconst number = sender.number || tenant.number || item.number || '521234567890';\nconst senderType = sender.type || item.sender_type || 'client';\n\nreturn {\n  message: text,\n  number: number,\n  sender_type: senderType,\n  tenant: tenant,\n  sender: sender\n};"
       },
       "id": "code-norm-f4",
       "name": "Code - Normalizar Entrada Orquestador Citas",
@@ -377,12 +381,23 @@
         ]
       ]
     },
-    "LM - OpenRouter (Citas)": {
+    "NVIDIA Nemotron Chat Model": {
       "ai_languageModel": [
         [
           {
             "node": "AI Agent - Extraer Datos de Cita",
             "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent - Extraer Datos de Cita",
+            "type": "ai_memory",
             "index": 0
           }
         ]
